@@ -223,9 +223,9 @@ function applyRouteBrand(route = window.location.hash || "#/dashboard") {
   const title = document.getElementById("appBrandTitle");
   const subtitle = document.getElementById("appBrandSubtitle");
   if (title) title.textContent = executive ? "Chỉ đạo điều hành" : "Nhiệm vụ và đánh giá KPI";
-  if (subtitle) subtitle.textContent = "Trung tâm Bảo trợ xã hội Tân Hiệp";
+  if (subtitle) subtitle.textContent = "Hỗ trợ xã hội";
   document.body.classList.toggle("is-executive-route", executive);
-  document.title = executive ? "Chỉ đạo điều hành - Tân Hiệp" : "Nhiệm vụ và đánh giá KPI";
+  document.title = executive ? "Chỉ đạo điều hành - HTXH" : "Nhiệm vụ và đánh giá KPI";
 }
 
 function bindRouteBranding() {
