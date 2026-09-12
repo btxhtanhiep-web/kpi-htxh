@@ -44,7 +44,7 @@ function elementBlocks(root){const blocks=[];const pushText=(el,opts={})=>{const
   return blocks.join('');
 }
 
-export function buildDocxBlobFromElement(root,{title='Báo cáo KPI cá nhân',creator='Trung tâm Bảo trợ xã hội Tân Hiệp'}={}){
+export function buildDocxBlobFromElement(root,{title='Báo cáo KPI cá nhân',creator='Hỗ trợ xã hội'}={}){
   if(!root)throw new Error('Không tìm thấy nội dung biểu mẫu để xuất Word.');
   const body=elementBlocks(root);
   const documentXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1134" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>`;
@@ -54,7 +54,7 @@ export function buildDocxBlobFromElement(root,{title='Báo cáo KPI cá nhân',c
   const types=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
   const now=new Date().toISOString();
   const core=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(title)}</dc:title><dc:creator>${esc(creator)}</dc:creator><cp:lastModifiedBy>Ứng dụng Nhiệm vụ và đánh giá KPI</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`;
-  const app=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Nhiệm vụ và đánh giá KPI - Tân Hiệp</Application></Properties>`;
+  const app=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Nhiệm vụ và đánh giá KPI - Hỗ trợ xã hội</Application></Properties>`;
   const zip=zipStore([{name:'[Content_Types].xml',content:types},{name:'_rels/.rels',content:rels},{name:'docProps/core.xml',content:core},{name:'docProps/app.xml',content:app},{name:'word/document.xml',content:documentXml},{name:'word/styles.xml',content:styles},{name:'word/_rels/document.xml.rels',content:docRels}]);
   return new Blob([zip],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
 }
