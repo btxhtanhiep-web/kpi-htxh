@@ -159,7 +159,7 @@ export function buildKpiWorkbookBlob({
   ];
 
   const sheetRows = [];
-  sheetRows.push(makeRow(1, [{ value: 'TRUNG TÂM BẢO TRỢ XÃ HỘI TÂN HIỆP', style: 5 }, ...Array(10).fill({ value:'', style:5 })], { height: 23 }));
+  sheetRows.push(makeRow(1, [{ value: 'HỖ TRỢ XÃ HỘI', style: 5 }, ...Array(10).fill({ value:'', style:5 })], { height: 23 }));
   const reportTitle = `BẢNG TÍNH ĐIỂM KPI CÁ NHÂN${periodLabel ? ` – ${periodLabel}` : ''}`;
   sheetRows.push(makeRow(2, [{ value: reportTitle, style: 6 }, ...Array(10).fill({ value:'', style:6 })], { height: 30 }));
   sheetRows.push(makeRow(3, [
@@ -299,7 +299,7 @@ export function buildKpiWorkbookBlob({
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
   const now = new Date().toISOString();
   const core = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Bảng tính điểm KPI cá nhân</dc:title><dc:creator>Trung tâm Bảo trợ xã hội Tân Hiệp</dc:creator><cp:lastModifiedBy>Ứng dụng Nhiệm vụ và đánh giá KPI</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`;
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Bảng tính điểm KPI cá nhân</dc:title><dc:creator>Hỗ trợ xã hội</dc:creator><cp:lastModifiedBy>Ứng dụng Nhiệm vụ và đánh giá KPI</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`;
   const app = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Nhiệm vụ và đánh giá KPI - Tân Hiệp</Application></Properties>`;
 
