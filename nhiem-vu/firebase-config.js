@@ -2,7 +2,7 @@
  * =========================================================
  * CẤU HÌNH FIREBASE
  * Hệ thống Nhiệm vụ và đánh giá KPI
- * Trung tâm Bảo trợ xã hội Tân Hiệp
+ * Trung tâm Hỗ trợ xã hội
  * =========================================================
  */
 
@@ -20,12 +20,12 @@ import {
 
 
 const firebaseConfig = {
-  apiKey: "__FIREBASE_API_KEY__",
-  authDomain: "__FIREBASE_AUTH_DOMAIN__",
-  projectId: "__FIREBASE_PROJECT_ID__",
-  storageBucket: "__FIREBASE_STORAGE_BUCKET__",
-  messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
-  appId: "__FIREBASE_APP_ID__"
+  apiKey: "AIzaSyCOF2ocM8lj8lj3pJH2ojlr4rawjcv1UM",
+  authDomain: "kpi-htxh-4b6e9.firebaseapp.com",
+  projectId: "kpi-htxh-4b6e9",
+  storageBucket: "kpi-htxh-4b6e9.firebasestorage.app",
+  messagingSenderId: "12332823471",
+  appId: "1:12332823471:web:26e435911b224eb505355a"
 };
 
 if (Object.values(firebaseConfig).some(value => String(value || "").startsWith("__FIREBASE_"))) {
