@@ -4047,7 +4047,7 @@ async function openReport() {
     exportDomToDocx(el('kpiPdfPreview'), {
       fileName:`Bao_cao_KPI_${formLabel.replace(/\s+/g,'_')}_${KpiWorkflowState.period?.id || 'ky'}_${fullName}.docx`,
       title:`Báo cáo KPI cá nhân ${formLabel}${periodLabel ? ` - ${periodLabel}` : ''}`,
-      creator:'Trung tâm Bảo trợ xã hội Tân Hiệp'
+      creator: 'Hỗ trợ xã hội'
     });
   });
   el('kpiExportXlsx')?.addEventListener('click', () => {
