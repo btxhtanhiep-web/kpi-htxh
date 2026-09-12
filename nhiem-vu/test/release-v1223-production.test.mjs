@@ -62,7 +62,7 @@ test('Formatted Excel exporter is native XLSX and contains regulated score summa
 test('Product catalog reuses official two-column agency/national header for popup and print', () => {
   const workflow = read('modules/kpi/kpi-workflow.js');
   assert.match(workflow, /kpi-product-official-header/);
-  assert.match(workflow, /SỞ Y TẾ<br>THÀNH PHỐ HỒ CHÍ MINH<br>TRUNG TÂM BẢO TRỢ XÃ HỘI TÂN HIỆP/);
+  assert.match(workflow, /SỞ Y TẾ<br>THÀNH PHỐ HỒ CHÍ MINH<br>TRUNG TÂM HỖ TRỢ XÃ HỘI/);
   assert.match(workflow, /CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM/);
   assert.match(workflow, /Độc lập - Tự do - Hạnh phúc/);
   const css = read('ui-v1.22.3.css');
