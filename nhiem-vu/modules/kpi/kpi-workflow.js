@@ -22,7 +22,7 @@ import {
 import { resolveKpiReviewer, canReviewKpiOwner } from '../../core/kpi-review-authority.js?v=20260911.V1_23_1';
 import { ModalService } from '../../core/modal-service.js?v=20260911.V1_23_1';
 import { exportFormattedKpiWorkbook, exportProductCatalogWorkbook } from '../../services/xlsx-export-service.js?v=20260911.V1_23_1';
-import { exportDomToDocx } from '../../services/docx-export-service.js?v=20260911.V1_23_1';
+import { exportM01TemplateWorkbook } from '../../services/m01-xlsx-template-service.js?v=20260911.V1_23_1';
 
 export const KpiWorkflowState = {
   user: null,
@@ -3935,7 +3935,40 @@ async function openReport() {
     }).join('');
     return `<tr class="m01-group-row"><td class="m01-center">${esc(group.code)}</td><td colspan="3"><strong>${esc(group.title)}</strong></td><td class="m01-center">${fmt(group.max)}</td><td class="m01-center">${fmt(groupSelf)}</td><td class="m01-center">${commonScore.official ? fmt(groupConfirmed) : ''}</td><td></td></tr>${rows}`;
   }).join('');
+  const criterionExportRows = criteria.map(c => {
+    const value = resultFor(c.code);
 
+    const selfScore = value.selfScore
+      ?? (
+        value.selfResult === 'DAM_BAO'
+          ? c.max
+          : value.selfResult === 'KHONG_DAM_BAO'
+            ? 0
+            : ''
+      );
+
+    const confirmedScore = commonScore.official
+      ? (
+        value.confirmedScore
+        ?? (
+          value.confirmedResult === 'DAM_BAO'
+            ? c.max
+            : value.confirmedResult === 'KHONG_DAM_BAO'
+              ? 0
+              : ''
+        )
+      )
+      : '';
+
+    return {
+      code: c.code,
+      selfScore,
+      confirmedScore,
+      note: commonScore.official
+        ? (value.confirmedNote || value.note || '')
+        : (value.note || '')
+    };
+  });
   const taskRows = mine.map((task, index) => {
     const evaluation = evaluationFor(task.id);
     const applied = evaluationScoreSnapshot(evaluation);
@@ -4035,25 +4068,277 @@ async function openReport() {
   const reportScoreSummary = scorecardSummaryData(KpiWorkflowState.user.uid, s);
   const excelHtml = `<div id="kpiExcelPreview" class="kpi-hidden"><div class="kpi-score-state ${scoreState.className}" data-kpi-report-score-state="excel"><span class="kpi-score-state-icon">${scoreState.code === 'OFFICIAL' ? '✓' : '✎'}</span><div><strong>${esc(scoreState.label)}</strong><span>${esc(scoreState.detail)}</span></div></div><div class="kpi-scorecard-desktop"><div class="kpi-table-wrap"><table class="kpi-table kpi-wide-table"><thead><tr><th>STT</th><th>Tên công việc</th><th>Điểm chuẩn</th><th>Hệ số độ khó</th><th>Điểm quy đổi tối đa</th><th>Tiến độ</th><th>Kết quả</th><th>Điểm thực hiện</th><th>Điểm quy đổi thực tế</th><th>Vượt yêu cầu</th><th>Minh chứng</th></tr></thead><tbody>${mine.map((t, i) => { const evaluation=evaluationFor(t.id); const applied=evaluationScoreSnapshot(evaluation); return `<tr><td>${i + 1}</td><td><strong>${esc(t.taskCode || '')}</strong><br>${esc(t.title)}</td><td>${fmt(t.baseScore)}</td><td>${coefficientPercent(t.difficultyCoefficient)}</td><td>${fmt(t.maximumConvertedScore)}</td><td>${applied.progressRate ?? ''}${applied.progressRate !== null ? '%' : ''}</td><td>${applied.resultRate ?? ''}${applied.resultRate !== null ? '%' : ''}</td><td>${applied.hasScore ? fmt(applied.executionScore) : ''}</td><td><strong>${applied.hasScore ? fmt(applied.convertedActualScore) : ''}</strong></td><td class="m01-center">${esc(scorecardExceededLabel(evaluation))}</td><td>${evidenceCellHtml(evidenceMap.get(t.id) || [], t)}</td></tr>`; }).join('')}</tbody></table>${scorecardSummaryTableHtml(reportScoreSummary)}</div></div><div class="kpi-scorecard-mobile">${mine.map(t=>{const evaluation=evaluationFor(t.id);const applied=evaluationScoreSnapshot(evaluation);const files=evidenceMap.get(t.id)||[];return `<article class="kpi-score-card"><strong>${esc(t.taskCode||'')} — ${esc(t.title||'')}</strong><div><span>Điểm chuẩn ${fmt(t.baseScore)}</span><span>Hệ số ${coefficientPercent(t.difficultyCoefficient)}</span><span>Tối đa ${fmt(t.maximumConvertedScore)}</span></div><div><span>Tiến độ ${applied.progressRate??'—'}%</span><span>Kết quả ${applied.resultRate??'—'}%</span><span>Điểm thực tế <b>${applied.hasScore?fmt(applied.convertedActualScore):'—'}</b></span></div><div><span>Vượt yêu cầu: <b>${esc(scorecardExceededLabel(evaluation)||'Không')}</b></span><span>Minh chứng: ${files.length} tệp</span></div></article>`}).join('')}${scorecardSummaryCardsHtml(reportScoreSummary)}</div></div>`;
 
-  const reportRoot = modal(`Báo cáo KPI cá nhân · ${formLabel}`, `<div class="kpi-preview-tabs kpi-no-print"><button id="kpiPdfTab" class="kpi-button secondary active" type="button">${formLabel}</button><button id="kpiExcelTab" class="kpi-button secondary" type="button">Bảng tính điểm</button></div>${pdfHtml}${excelHtml}`, '<button class="kpi-button secondary" data-kpi-close type="button">Đóng</button><button id="kpiExportDocx" class="kpi-button secondary" type="button">📄 Xuất Word (.docx)</button><button id="kpiExportXlsx" class="kpi-button secondary" type="button">📊 Xuất Excel (.xlsx)</button><button id="kpiPrintReport" class="kpi-button" type="button">🖨️ In biểu mẫu</button>');
+    const reportRoot = modal(
+    `Báo cáo KPI cá nhân · ${formLabel}`,
+    `<div class="kpi-preview-tabs kpi-no-print">
+      <button
+        id="kpiPdfTab"
+        class="kpi-button secondary active"
+        type="button"
+      >
+        ${formLabel}
+      </button>
+
+      <button
+        id="kpiExcelTab"
+        class="kpi-button secondary"
+        type="button"
+      >
+        Bảng tính điểm
+      </button>
+    </div>
+    ${pdfHtml}
+    ${excelHtml}`,
+    '<button class="kpi-button secondary" data-kpi-close type="button">Đóng</button>'
+      + '<button id="kpiExportDocx" class="kpi-button secondary" type="button">📄 Xuất Word (.docx)</button>'
+      + `<button id="kpiExportXlsx" class="kpi-button secondary" type="button">📊 Xuất Excel ${formLabel}</button>`
+      + '<button id="kpiPrintReport" class="kpi-button" type="button">🖨️ In biểu mẫu</button>'
+  );
+
   reportRoot.dataset.kpiReadonlyModal = 'report';
   reportRoot.dataset.kpiUserId = KpiWorkflowState.user.uid;
-  el('kpiPdfTab').addEventListener('click', () => { el('kpiPdfPreview').classList.remove('kpi-hidden'); el('kpiExcelPreview').classList.add('kpi-hidden'); el('kpiPdfTab').classList.add('active'); el('kpiExcelTab').classList.remove('active'); el('kpiPrintReport').classList.remove('kpi-hidden'); });
-  el('kpiExcelTab').addEventListener('click', () => { el('kpiPdfPreview').classList.add('kpi-hidden'); el('kpiExcelPreview').classList.remove('kpi-hidden'); el('kpiPdfTab').classList.remove('active'); el('kpiExcelTab').classList.add('active'); el('kpiPrintReport').classList.add('kpi-hidden'); });
-  el('kpiPrintReport').addEventListener('click', () => window.print());
+  reportRoot.dataset.activeReportTab = 'form';
+
+  // ============================================================
+  // ĐỒNG BỘ NÚT XUẤT THEO TAB ĐANG MỞ
+  // ============================================================
+  const syncReportExportButtons = () => {
+    const formTabActive =
+      reportRoot.dataset.activeReportTab !== 'score';
+
+    const xlsxButton = el('kpiExportXlsx');
+    const docxButton = el('kpiExportDocx');
+    const printButton = el('kpiPrintReport');
+
+    if (xlsxButton) {
+      xlsxButton.textContent = formTabActive
+        ? `📊 Xuất Excel ${formLabel}`
+        : '📊 Xuất Excel Bảng tính điểm';
+    }
+
+    // Word và In chỉ phục vụ Mẫu 01-A / 01-B.
+    docxButton?.classList.toggle(
+      'kpi-hidden',
+      !formTabActive
+    );
+
+    printButton?.classList.toggle(
+      'kpi-hidden',
+      !formTabActive
+    );
+  };
+
+  // ============================================================
+  // TAB MẪU 01-A / 01-B
+  // ============================================================
+  el('kpiPdfTab').addEventListener('click', () => {
+    reportRoot.dataset.activeReportTab = 'form';
+
+    el('kpiPdfPreview').classList.remove('kpi-hidden');
+    el('kpiExcelPreview').classList.add('kpi-hidden');
+
+    el('kpiPdfTab').classList.add('active');
+    el('kpiExcelTab').classList.remove('active');
+
+    syncReportExportButtons();
+  });
+
+  // ============================================================
+  // TAB BẢNG TÍNH ĐIỂM
+  // ============================================================
+  el('kpiExcelTab').addEventListener('click', () => {
+    reportRoot.dataset.activeReportTab = 'score';
+
+    el('kpiPdfPreview').classList.add('kpi-hidden');
+    el('kpiExcelPreview').classList.remove('kpi-hidden');
+
+    el('kpiPdfTab').classList.remove('active');
+    el('kpiExcelTab').classList.add('active');
+
+    syncReportExportButtons();
+  });
+
+  // ============================================================
+  // IN MẪU
+  // ============================================================
+  el('kpiPrintReport').addEventListener(
+    'click',
+    () => window.print()
+  );
+
+  // ============================================================
+  // XUẤT WORD 01-A / 01-B
+  // Giữ nguyên nghiệp vụ Word hiện tại
+  // ============================================================
   el('kpiExportDocx')?.addEventListener('click', () => {
-    const periodLabel = clean(KpiWorkflowState.period?.name || KpiWorkflowState.period?.id || '');
-    const fullName = clean(KpiWorkflowState.profile?.fullName || 'ca_nhan');
-    exportDomToDocx(el('kpiPdfPreview'), {
-      fileName:`Bao_cao_KPI_${formLabel.replace(/\s+/g,'_')}_${KpiWorkflowState.period?.id || 'ky'}_${fullName}.docx`,
-      title:`Báo cáo KPI cá nhân ${formLabel}${periodLabel ? ` - ${periodLabel}` : ''}`,
-      creator: 'Hỗ trợ xã hội'
-    });
+    const periodLabel = clean(
+      KpiWorkflowState.period?.name
+      || KpiWorkflowState.period?.id
+      || ''
+    );
+
+    const fullName = clean(
+      KpiWorkflowState.profile?.fullName
+      || 'ca_nhan'
+    );
+
+    exportDomToDocx(
+      el('kpiPdfPreview'),
+      {
+        fileName:
+          `Bao_cao_KPI_${formLabel.replace(/\s+/g, '_')}_`
+          + `${KpiWorkflowState.period?.id || 'ky'}_`
+          + `${fullName}.docx`,
+
+        title:
+          `Báo cáo KPI cá nhân ${formLabel}`
+          + `${periodLabel ? ` - ${periodLabel}` : ''}`,
+
+        creator: 'Trung tâm Hỗ trợ xã hội'
+      }
+    );
   });
-  el('kpiExportXlsx')?.addEventListener('click', () => {
-    const currentTasks = personalTasksForUser(KpiWorkflowState.user.uid).filter(taskRequiresOfficialEvaluation);
-    exportReportXlsx(currentTasks, summaryForUserCombined(KpiWorkflowState.user.uid), reportDepartmentId, evidenceMap);
-  });
+
+  // ============================================================
+  // XUẤT EXCEL THEO TAB
+  // ============================================================
+  el('kpiExportXlsx')?.addEventListener(
+    'click',
+    async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+
+      try {
+        // --------------------------------------------------------
+        // TRƯỜNG HỢP 1:
+        // Đang ở tab BẢNG TÍNH ĐIỂM
+        // → giữ nguyên exporter hiện tại
+        // --------------------------------------------------------
+        if (
+          reportRoot.dataset.activeReportTab === 'score'
+        ) {
+          const currentTasks =
+            personalTasksForUser(
+              KpiWorkflowState.user.uid
+            )
+            .filter(
+              taskRequiresOfficialEvaluation
+            );
+
+          exportReportXlsx(
+            currentTasks,
+            summaryForUserCombined(
+              KpiWorkflowState.user.uid
+            ),
+            reportDepartmentId,
+            evidenceMap
+          );
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // TRƯỜNG HỢP 2:
+        // Đang ở Mẫu 01-A / 01-B
+        // → dùng template Excel chuẩn
+        // --------------------------------------------------------
+        const fullName = clean(
+          profile.fullName
+          || KpiWorkflowState.profile?.fullName
+          || 'ca_nhan'
+        );
+
+        await exportM01TemplateWorkbook({
+          formType,
+
+          fileName:
+            `Bao_cao_KPI_${formLabel.replace(/\s+/g, '_')}_`
+            + `${KpiWorkflowState.period?.id || 'ky'}_`
+            + `${fullName}.xlsx`,
+
+          organizationName:
+            'TRUNG TÂM HỖ TRỢ XÃ HỘI',
+
+          quarterText,
+          reportDateLine,
+
+          profile: {
+            fullName,
+            birthDate,
+            partyPosition,
+            governmentPosition,
+            unionPosition,
+            departmentName
+          },
+
+          criteriaScores:
+            criterionExportRows,
+
+          selfCommonTotal:
+            commonRecord
+            && hasNumericValue(
+              commonRecord.selfTotal
+            )
+              ? Number(
+                  commonRecord.selfTotal
+                )
+              : 0,
+
+          confirmedCommonTotal:
+            commonScore.official
+              ? Number(
+                  commonScore.total || 0
+                )
+              : '',
+
+          kpiScore:
+            s.hasCalculationBasis
+              ? Number(
+                  s.kpi70 || 0
+                )
+              : '',
+
+          bonusScore:
+            Number(
+              reportBonusPresentation
+                .displayBonus || 0
+            ),
+
+          bonusPending:
+            reportBonusPresentation
+              .hasPendingBonus === true,
+
+          totalScore:
+            reportTotal100 == null
+              ? ''
+              : Number(
+                  reportTotal100
+                ),
+
+          rating:
+            reportRating
+        });
+
+      } catch (error) {
+        console.error(
+          'Không thể xuất Excel Mẫu 01:',
+          error
+        );
+
+        ModalService.alert(
+          `Không thể xuất Excel ${formLabel}: `
+          + `${error?.message || 'Lỗi không xác định.'}`
+        );
+
+      } finally {
+        button.disabled = false;
+        syncReportExportButtons();
+      }
+    }
+  );
+
+  // Đồng bộ trạng thái lần đầu khi mở modal
+  syncReportExportButtons();
 }
 
 function exportReportXlsx(tasks, summaryData, departmentId = profileDepartmentId(), evidenceMap = new Map()) {
