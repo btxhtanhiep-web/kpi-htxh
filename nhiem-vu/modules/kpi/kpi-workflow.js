@@ -2753,7 +2753,7 @@ function openDepartmentReport(options = {}) {
       ? '<tr><th>STT</th><th>Họ và tên</th><th>Vai trò Chi đoàn</th><th>Nhiệm vụ Chi đoàn</th><th>Điểm kế hoạch (A)</th><th>Điểm thực tế (B)</th><th>Trạng thái đánh giá</th></tr>'
       : '<tr><th>STT</th><th>Họ và tên</th><th>Chức vụ</th><th>Nhiệm vụ tính KPI</th><th>Điểm công việc</th><th>Điểm thưởng</th><th>Điểm tiêu chí chung</th><th>Tổng điểm</th><th>Mức xếp loại</th><th>Trạng thái điểm</th></tr>';
     root.querySelector('#departmentReportContent').innerHTML = people.length ? `<div id="departmentReportPrint" class="department-report kpi-report-print">
-      <div class="department-report-heading"><strong>TRUNG TÂM BẢO TRỢ XÃ HỘI TÂN HIỆP</strong><h2>${reportHeading}</h2><p>${esc(KpiWorkflowState.period?.name || '')} · ${esc(scopeTitle)}</p><small>${esc(reportNote)}</small></div>
+      <div class="department-report-heading"><strong>TRUNG TÂM HỖ TRỢ XÃ HỘI</strong><h2>${reportHeading}</h2><p>${esc(KpiWorkflowState.period?.name || '')} · ${esc(scopeTitle)}</p><small>${esc(reportNote)}</small></div>
       <div class="kpi-table-wrap"><table class="kpi-report-table department-report-table"><thead>${tableHead}</thead><tbody>${body}</tbody></table></div>
       <div class="department-report-signatures"><div><strong>NGƯỜI LẬP BIỂU</strong><br><em>(Ký, ghi rõ họ tên)</em></div><div><strong>${isCdtnAggregate ? 'BÍ THƯ/PHÓ BÍ THƯ CHI ĐOÀN' : departmentId === 'ALL' ? 'BAN GIÁM ĐỐC' : 'TRƯỞNG PHÒNG/KHU'}</strong><br><em>(Ký, ghi rõ họ tên)</em></div></div>
     </div>` : '<div class="kpi-empty">Chưa có dữ liệu đánh giá trong kỳ này.</div>';
@@ -3983,7 +3983,7 @@ async function openReport() {
 
   const pdfHtml = `<div id="kpiPdfPreview" class="kpi-report kpi-report-print m01-report">
     <div class="m01-top">
-      <div class="m01-agency"><strong>SỞ Y TẾ<br>THÀNH PHỐ HỒ CHÍ MINH<br>TRUNG TÂM BẢO TRỢ XÃ HỘI TÂN HIỆP</strong></div>
+      <div class="m01-agency"><strong>SỞ Y TẾ<br>THÀNH PHỐ HỒ CHÍ MINH<br>TRUNG TÂM HỖ TRỢ XÃ HỘI</strong></div>
       <div class="m01-national"><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><div class="m01-motto"><strong>Độc lập - Tự do - Hạnh phúc</strong></div><div><em>${esc(reportDateLine)}</em></div></div>
       <div class="m01-form-number">${formLabel}</div>
     </div>
