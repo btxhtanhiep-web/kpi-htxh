@@ -393,7 +393,7 @@ test('Điểm chính thức yêu cầu tất cả nhiệm vụ bắt buộc + th
 
 // 46
 test('Mẫu 01A/01B in đúng tiêu đề hành chính và không dùng tiêu đề Đảng cũ', () => {
-  assert.match(reportBlock,/SỞ Y TẾ<br>THÀNH PHỐ HỒ CHÍ MINH<br>Trung tâm Hỗ trợ xã hội /);
+  assert.match(reportBlock,/SỞ Y TẾ<br>THÀNH PHỐ HỒ CHÍ MINH<br>TRUNG TÂM BẢO TRỢ XÃ HỘI TÂN HIỆP/);
   assert.match(reportBlock,/CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM/);
   assert.match(reportBlock,/Độc lập - Tự do - Hạnh phúc/);
   assert.match(reportBlock,/Mẫu 01-A/);
