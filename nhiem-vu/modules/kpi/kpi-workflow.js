@@ -1,28 +1,29 @@
-import { auth, db } from '../../firebase-config.js?v=20260911.V1_23_1';
+import { auth, db } from '../../firebase-config.js?v=20260916.V1_24_7_HTXH_1';
 import {
   addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs, onSnapshot, query,
   serverTimestamp, setDoc, Timestamp, updateDoc, where, limit, writeBatch
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
-import { TaskRegistrationService } from '../../services/task-registration-service.js?v=20260911.V1_23_1';
-import { TaskWorkItemService } from '../../services/task-work-item-service.js?v=20260911.V1_23_1';
-import { TaskMilestoneService } from '../../services/task-milestone-service.js?v=20260911.V1_23_1';
-import { TaskEvidenceService } from '../../services/task-evidence-service.js?v=20260911.V1_23_1';
-import { PeriodArchiveService } from '../../services/period-archive-service.js?v=20260911.V1_23_1';
-import { PeriodReadService } from '../../services/period-read-service.js?v=20260911.V1_23_1';
-import { TaskReadService } from '../../services/task-read-service.js?v=20260911.V1_23_1';
-import { Permissions } from '../../core/permissions.js?v=20260911.V1_23_1';
-import { UserContext } from '../../core/user-context.js?v=20260911.V1_23_1';
-import { APP_VERSION } from '../../core/app-version.js?v=20260911.V1_23_1';
-import { compareTasksForDisplay } from '../../core/task-display-order.js?v=20260911.V1_23_1';
-import { friendlyErrorMessage, isPermissionDeniedError } from '../../core/friendly-error.js?v=20260911.V1_23_1';
+import { TaskRegistrationService } from '../../services/task-registration-service.js?v=20260916.V1_24_7_HTXH_1';
+import { TaskWorkItemService } from '../../services/task-work-item-service.js?v=20260916.V1_24_7_HTXH_1';
+import { TaskMilestoneService } from '../../services/task-milestone-service.js?v=20260916.V1_24_7_HTXH_1';
+import { TaskEvidenceService } from '../../services/task-evidence-service.js?v=20260916.V1_24_7_HTXH_1';
+import { PeriodArchiveService } from '../../services/period-archive-service.js?v=20260916.V1_24_7_HTXH_1';
+import { PeriodReadService } from '../../services/period-read-service.js?v=20260916.V1_24_7_HTXH_1';
+import { TaskReadService } from '../../services/task-read-service.js?v=20260916.V1_24_7_HTXH_1';
+import { Permissions } from '../../core/permissions.js?v=20260916.V1_24_7_HTXH_1';
+import { UserContext } from '../../core/user-context.js?v=20260916.V1_24_7_HTXH_1';
+import { APP_VERSION } from '../../core/app-version.js?v=20260916.V1_24_7_HTXH_1';
+import { compareTasksForDisplay } from '../../core/task-display-order.js?v=20260916.V1_24_7_HTXH_1';
+import { friendlyErrorMessage, isPermissionDeniedError } from '../../core/friendly-error.js?v=20260916.V1_24_7_HTXH_1';
 import {
   KPI2B as KPI2C, M01_GROUPS, COMMON_CRITERIA, commonCriteriaForProfile, reportFormTypeForProfile, calculateTaskScore, calculateKpiSummary,
   proposedRating, resolveQualityRating, ratingName, round2, progressRateFromDates, convertAppendix04Rate, calculateMilestoneProgress, calculateBonusScore
-} from '../../kpi-engine.js?v=20260911.V1_23_1';
-import { resolveKpiReviewer, canReviewKpiOwner } from '../../core/kpi-review-authority.js?v=20260911.V1_23_1';
-import { ModalService } from '../../core/modal-service.js?v=20260911.V1_23_1';
-import { exportFormattedKpiWorkbook, exportProductCatalogWorkbook } from '../../services/xlsx-export-service.js?v=20260911.V1_23_1';
-import { exportM01TemplateWorkbook } from '../../services/m01-xlsx-template-service.js?v=20260911.V1_23_1';
+} from '../../kpi-engine.js?v=20260916.V1_24_7_HTXH_1';
+import { resolveKpiReviewer, canReviewKpiOwner } from '../../core/kpi-review-authority.js?v=20260916.V1_24_7_HTXH_1';
+import { ModalService } from '../../core/modal-service.js?v=20260916.V1_24_7_HTXH_1';
+import { exportFormattedKpiWorkbook, exportProductCatalogWorkbook, exportDepartmentSummaryWorkbook } from '../../services/xlsx-export-service.js?v=20260916.V1_24_7_HTXH_1';
+import { exportDomToDocx } from '../../services/docx-export-service.js?v=20260916.V1_24_7_HTXH_1';
+import { exportM01TemplateWorkbook } from '../../services/m01-xlsx-template-service.js?v=20260916.V1_24_7_HTXH_1';
 
 export const KpiWorkflowState = {
   user: null,
@@ -294,7 +295,7 @@ async function manualRefreshKpi() {
   const button = el('kpiRefresh');
   if (button) button.disabled = true;
 
-  kpiReloadPromise = Promise.resolve(loadAll()).finally(() => {
+  kpiReloadPromise = Promise.resolve(loadAll({ realtimeBootstrap: true })).finally(() => {
     kpiReloadPromise = null;
     if (button?.isConnected) button.disabled = false;
   });
@@ -324,6 +325,16 @@ function kpiRealtimeScope() {
   const actingApprovalScope = departmentId !== 'ALL' && departmentId !== 'CDTN'
     && Permissions.hasHeadAuthorityForDepartment(KpiWorkflowState.profile, departmentId);
   const primaryHeadScope = isDepartmentHead() && departmentId === managerHomeDepartmentId;
+  /*
+   * V1.24.3: mọi lãnh đạo đang xem đúng Phòng/Khu chính phải nhận được cả hồ sơ
+   * Chi đoàn của viên chức thuộc Phòng/Khu đó qua homeDepartmentId.
+   * Phạm vi này KHÔNG mở rộng sang đơn vị acting/kiêm nhiệm khác vì Rules chỉ cho
+   * homeDepartmentLeaderCanView() khi sameDepartment(homeDepartmentId).
+   */
+  const primaryHomeDepartmentLeaderScope = isLeader()
+    && managerHomeDepartmentId
+    && managerHomeDepartmentId !== 'CDTN'
+    && departmentId === managerHomeDepartmentId;
   const taskDepartmentScope = departmentId !== 'ALL' && (globalRole() || cdtnDepartmentScope || primaryHeadScope || actingViewScope || reportDepartmentScope
     || hasActiveApprovalDelegation('APPROVE_REGISTRATIONS', departmentId)
     || hasActiveApprovalDelegation('CONFIRM_EVALUATIONS', departmentId)
@@ -344,7 +355,8 @@ function kpiRealtimeScope() {
     evaluationDepartmentScope,
     combinedDepartmentReportScope,
     managerMonitoringScope,
-    managerHomeDepartmentId
+    managerHomeDepartmentId,
+    primaryHomeDepartmentLeaderScope
   };
 }
 
@@ -361,7 +373,8 @@ function kpiRealtimeQueries(kind) {
     evaluationDepartmentScope,
     combinedDepartmentReportScope,
     managerMonitoringScope,
-    managerHomeDepartmentId
+    managerHomeDepartmentId,
+    primaryHomeDepartmentLeaderScope
   } = scope;
   const col = collection(db, kind);
   const q = (...constraints) => query(col, ...constraints);
@@ -389,12 +402,18 @@ function kpiRealtimeQueries(kind) {
 
   if (kind === 'taskRegistrations') {
     if (fullCenterScope) return [q(where('periodId','==',periodId), limit(5000))];
-    if (professionalCenterScope) return [q(where('periodId','==',periodId), where('departmentId','in',PROFESSIONAL_DEPARTMENT_IDS), limit(5000))];
+    if (professionalCenterScope) {
+      const references = [q(where('periodId','==',periodId), where('departmentId','in',PROFESSIONAL_DEPARTMENT_IDS), limit(5000))];
+      if (managerMonitoringScope) {
+        references.push(q(where('periodId','==',periodId), where('homeDepartmentId','==',managerHomeDepartmentId), limit(2000)));
+      }
+      return references;
+    }
     if (departmentId === 'CDTN' && registrationDepartmentScope) return [
       q(where('periodId','==',periodId), where('departmentId','==','CDTN'), limit(1000)),
       q(where('periodId','==',periodId), where('organizationId','==','CDTN'), limit(1000))
     ];
-    if (combinedDepartmentReportScope) return [
+    if (combinedDepartmentReportScope || primaryHomeDepartmentLeaderScope) return [
       q(where('periodId','==',periodId), where('departmentId','==',departmentId), limit(2000)),
       q(where('periodId','==',periodId), where('homeDepartmentId','==',departmentId), limit(2000))
     ];
@@ -404,12 +423,18 @@ function kpiRealtimeQueries(kind) {
 
   if (kind === 'taskEvaluations') {
     if (fullCenterScope) return [q(where('periodId','==',periodId), limit(5000))];
-    if (professionalCenterScope) return [q(where('periodId','==',periodId), where('departmentId','in',PROFESSIONAL_DEPARTMENT_IDS), limit(5000))];
+    if (professionalCenterScope) {
+      const references = [q(where('periodId','==',periodId), where('departmentId','in',PROFESSIONAL_DEPARTMENT_IDS), limit(5000))];
+      if (managerMonitoringScope) {
+        references.push(q(where('periodId','==',periodId), where('homeDepartmentId','==',managerHomeDepartmentId), limit(2000)));
+      }
+      return references;
+    }
     if (departmentId === 'CDTN' && evaluationDepartmentScope) return [
       q(where('periodId','==',periodId), where('departmentId','==','CDTN'), limit(1000)),
       q(where('periodId','==',periodId), where('organizationId','==','CDTN'), limit(1000))
     ];
-    if (combinedDepartmentReportScope) return [
+    if (combinedDepartmentReportScope || primaryHomeDepartmentLeaderScope) return [
       q(where('periodId','==',periodId), where('departmentId','==',departmentId), limit(2000)),
       q(where('periodId','==',periodId), where('homeDepartmentId','==',departmentId), limit(2000))
     ];
@@ -428,37 +453,62 @@ function kpiRealtimeQueries(kind) {
   return [];
 }
 
-function subscribeKpiStateCollection(collectionName, stateKey) {
+function subscribeKpiStateCollection(collectionName, stateKey, options = {}) {
   const queryRefs = kpiRealtimeQueries(collectionName);
-  if (!queryRefs.length) return;
+  if (!queryRefs.length) return Promise.resolve([]);
   const snapshots = queryRefs.map(() => null);
-  queryRefs.forEach((queryRef, index) => {
-    const unsubscribe = onSnapshot(queryRef, snapshot => {
-      snapshots[index] = new Map(snapshot.docs.map(item => [item.id, { id:item.id, ...item.data() }]));
+  const failures = queryRefs.map(() => null);
+  let initialResolved = false;
+
+  return new Promise((resolve, reject) => {
+    const emit = () => {
       if (snapshots.some(item => item === null)) return;
       const merged = new Map();
       snapshots.forEach(map => map.forEach((value,key) => merged.set(key,value)));
       KpiWorkflowState[stateKey] = [...merged.values()];
       if (stateKey === 'commonAll') KpiWorkflowState.common = commonAssessmentForUser(KpiWorkflowState.user.uid, activeScopeDepartmentId());
-      scheduleKpiLiveRender();
-    }, error => {
-      console.warn(`Theo dõi trực tiếp ${collectionName} bị gián đoạn:`, error);
-      const state = el('kpiRealtimeState');
-      if (state) { state.textContent = 'Đồng bộ trực tiếp tạm gián đoạn'; state.classList.remove('is-live'); }
+
+      const isInitialEmission = !initialResolved;
+      if (!initialResolved) {
+        initialResolved = true;
+        if (failures.every(Boolean)) {
+          reject(failures.find(Boolean) || new Error(`Không thể tải ${collectionName}.`));
+        } else {
+          resolve(KpiWorkflowState[stateKey]);
+        }
+      }
+      if (!(isInitialEmission && options.suppressInitialRender === true)) scheduleKpiLiveRender();
+    };
+
+    queryRefs.forEach((queryRef, index) => {
+      const unsubscribe = onSnapshot(queryRef, snapshot => {
+        snapshots[index] = new Map(snapshot.docs.map(item => [item.id, { id:item.id, ...item.data() }]));
+        failures[index] = null;
+        emit();
+      }, error => {
+        console.warn(`Theo dõi trực tiếp ${collectionName} bị gián đoạn:`, error);
+        snapshots[index] = new Map();
+        failures[index] = error || new Error(`Không thể theo dõi ${collectionName}.`);
+        const state = el('kpiRealtimeState');
+        if (state) { state.textContent = 'Đồng bộ trực tiếp tạm gián đoạn'; state.classList.remove('is-live'); }
+        emit();
+      });
+      kpiLiveUnsubscribers.push(unsubscribe);
     });
-    kpiLiveUnsubscribers.push(unsubscribe);
   });
 }
 
-function startKpiRealtime() {
+function startKpiRealtime(options = {}) {
   stopKpiRealtime();
   bindKpiRealtimeCleanup();
-  if (!KpiWorkflowState.period || !kpiRouteActive()) return;
+  if (!KpiWorkflowState.period || !kpiRouteActive()) return Promise.resolve([]);
 
-  subscribeKpiStateCollection('tasks', 'tasks');
-  subscribeKpiStateCollection('taskRegistrations', 'registrations');
-  subscribeKpiStateCollection('taskEvaluations', 'evaluations');
-  subscribeKpiStateCollection('commonCriteriaAssessments', 'commonAll');
+  const initialLoads = [
+    subscribeKpiStateCollection('tasks', 'tasks', options),
+    subscribeKpiStateCollection('taskRegistrations', 'registrations', options),
+    subscribeKpiStateCollection('taskEvaluations', 'evaluations', options),
+    subscribeKpiStateCollection('commonCriteriaAssessments', 'commonAll', options)
+  ];
 
   const state = el('kpiRealtimeState');
   if (state) {
@@ -466,6 +516,20 @@ function startKpiRealtime() {
     state.classList.remove('kpi-hidden');
     state.classList.add('is-live');
   }
+  return Promise.all(initialLoads);
+}
+
+function kpiStateSnapshot(items = []) {
+  return {
+    docs: (items || []).map(item => ({
+      id: item.id,
+      data: () => {
+        const data = { ...item };
+        delete data.id;
+        return data;
+      }
+    }))
+  };
 }
 
 function assessmentRate(value, label) {
@@ -978,8 +1042,7 @@ function renderManagementToolbar() {
     KpiWorkflowState.evaluations = [];
     KpiWorkflowState.commonAll = [];
     message(`Đang tải phạm vi ${departmentDisplayName(nextScope)}...`);
-    await loadAll();
-    startKpiRealtime();
+    await loadAll({ realtimeBootstrap: true });
   }));
   toolbar.querySelector('#kpiMobileScopeSelect')?.addEventListener('change', async event => {
     const nextScope = normalizeDepartment(event.currentTarget.value);
@@ -991,8 +1054,7 @@ function renderManagementToolbar() {
     KpiWorkflowState.evaluations = [];
     KpiWorkflowState.commonAll = [];
     message(`Đang tải phạm vi ${departmentDisplayName(nextScope)}...`);
-    await loadAll();
-    startKpiRealtime();
+    await loadAll({ realtimeBootstrap: true });
   });
   el('kpiCommonButton')?.addEventListener('click', openCommonCriteria);
   el('kpiLockPlan')?.addEventListener('click', lockDepartmentPlan);
@@ -1175,8 +1237,9 @@ async function loadCdtnUsers() {
   return users;
 }
 
-async function loadAll() {
+async function loadAll(options = {}) {
   if (!KpiWorkflowState.user || !KpiWorkflowState.profile) return;
+  const realtimeBootstrap = options.realtimeBootstrap === true && kpiRouteActive();
   try {
     message('Đang tải dữ liệu đánh giá...');
     const canBrowseCompletedPeriods = Permissions.canManageEvaluationPeriods() || activeRole('ADMIN');
@@ -1204,7 +1267,7 @@ async function loadAll() {
       KpiWorkflowState.delegations = [];
       KpiWorkflowState.kpiProfile = null;
       render();
-      message(Permissions.canManageEvaluationPeriods() ? 'Chưa có kỳ đánh giá đang hoạt động. ADMIN hoặc Trưởng/Phụ trách Phòng Tổ chức - Kế toán có thể tạo hoặc kích hoạt kỳ đánh giá.' : 'Chưa có kỳ đánh giá đang hoạt động.');
+      message(Permissions.canManageEvaluationPeriods() ? 'Chưa có kỳ đánh giá đang hoạt động. ADMIN hoặc Trưởng phòng TCKT có thể tạo hoặc kích hoạt kỳ đánh giá.' : 'Chưa có kỳ đánh giá đang hoạt động.');
       return;
     }
 
@@ -1296,12 +1359,24 @@ async function loadAll() {
       && managerHomeDepartmentId
       && managerHomeDepartmentId !== 'CDTN'
       && (departmentId === managerHomeDepartmentId || (departmentId === 'ALL' && globalRole()));
+    const primaryHomeDepartmentLeaderScope = isLeader()
+      && managerHomeDepartmentId
+      && managerHomeDepartmentId !== 'CDTN'
+      && departmentId === managerHomeDepartmentId;
     const combinedDepartmentReportScope = KpiWorkflowState.mode === 'reports'
       && departmentId !== 'ALL'
       && departmentId !== 'CDTN'
       && taskDepartmentScope;
 
-    const taskRequest = fullCenterScope
+    /* V1.24.1 QUOTA SAFE: initial snapshot của 4 collection realtime là bootstrap dữ liệu chính. */
+    const realtimeInitial = realtimeBootstrap
+      ? startKpiRealtime({ suppressInitialRender: true })
+      : null;
+    const realtimeSnapshot = stateKey => realtimeInitial.then(() => kpiStateSnapshot(KpiWorkflowState[stateKey]));
+
+    const taskRequest = realtimeBootstrap
+      ? realtimeSnapshot('tasks')
+      : fullCenterScope
       ? getDocs(query(collection(db, 'tasks'), where('periodId', '==', periodId), limit(5000)))
       : professionalCenterScope
         ? mergeAvailableSnapshotRequests([
@@ -1324,16 +1399,23 @@ async function loadAll() {
               ? getDocs(query(collection(db, 'tasks'), where('periodId', '==', periodId), where('primaryDepartmentId', '==', departmentId), limit(2000)))
               : getDocs(query(collection(db, 'tasks'), where('periodId', '==', periodId), where('ownerUserId', '==', KpiWorkflowState.user.uid), limit(300)));
 
-    const registrationRequest = fullCenterScope
+    const registrationRequest = realtimeBootstrap
+      ? realtimeSnapshot('registrations')
+      : fullCenterScope
       ? getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), limit(5000)))
       : professionalCenterScope
-        ? getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('departmentId', 'in', PROFESSIONAL_DEPARTMENT_IDS), limit(5000)))
+        ? mergeAvailableSnapshotRequests([
+            getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('departmentId', 'in', PROFESSIONAL_DEPARTMENT_IDS), limit(5000))),
+            ...(managerMonitoringScope
+              ? [getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('homeDepartmentId', '==', managerHomeDepartmentId), limit(2000)))]
+              : [])
+          ], managerMonitoringScope ? 'đăng ký chuyên môn toàn Trung tâm và đăng ký kiêm nhiệm/Chi đoàn của đơn vị' : 'đăng ký chuyên môn toàn Trung tâm')
         : departmentId === 'CDTN' && registrationDepartmentScope
           ? mergeAvailableSnapshotRequests([
               getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('departmentId', '==', 'CDTN'), limit(1000))),
               getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('organizationId', '==', 'CDTN'), limit(1000)))
             ], 'đăng ký nhiệm vụ Chi đoàn')
-          : combinedDepartmentReportScope
+          : (combinedDepartmentReportScope || primaryHomeDepartmentLeaderScope)
             ? mergeAvailableSnapshotRequests([
                 getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('departmentId', '==', departmentId), limit(2000))),
                 getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('homeDepartmentId', '==', departmentId), limit(2000)))
@@ -1342,16 +1424,23 @@ async function loadAll() {
               ? getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('departmentId', '==', departmentId), limit(2000)))
               : getDocs(query(collection(db, 'taskRegistrations'), where('periodId', '==', periodId), where('userId', '==', KpiWorkflowState.user.uid), limit(300)));
 
-    const evaluationRequest = fullCenterScope
+    const evaluationRequest = realtimeBootstrap
+      ? realtimeSnapshot('evaluations')
+      : fullCenterScope
       ? getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), limit(5000)))
       : professionalCenterScope
-        ? getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('departmentId', 'in', PROFESSIONAL_DEPARTMENT_IDS), limit(5000)))
+        ? mergeAvailableSnapshotRequests([
+            getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('departmentId', 'in', PROFESSIONAL_DEPARTMENT_IDS), limit(5000))),
+            ...(managerMonitoringScope
+              ? [getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('homeDepartmentId', '==', managerHomeDepartmentId), limit(2000)))]
+              : [])
+          ], managerMonitoringScope ? 'đánh giá chuyên môn toàn Trung tâm và đánh giá kiêm nhiệm/Chi đoàn của đơn vị' : 'đánh giá chuyên môn toàn Trung tâm')
         : departmentId === 'CDTN' && evaluationDepartmentScope
           ? mergeAvailableSnapshotRequests([
               getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('departmentId', '==', 'CDTN'), limit(1000))),
               getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('organizationId', '==', 'CDTN'), limit(1000)))
             ], 'đánh giá nhiệm vụ Chi đoàn')
-          : combinedDepartmentReportScope
+          : (combinedDepartmentReportScope || primaryHomeDepartmentLeaderScope)
             ? mergeAvailableSnapshotRequests([
                 getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('departmentId', '==', departmentId), limit(2000))),
                 getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('homeDepartmentId', '==', departmentId), limit(2000)))
@@ -1360,7 +1449,9 @@ async function loadAll() {
               ? getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('departmentId', '==', departmentId), limit(2000)))
               : getDocs(query(collection(db, 'taskEvaluations'), where('periodId', '==', periodId), where('ownerUserId', '==', KpiWorkflowState.user.uid), limit(300)));
 
-    const commonRequest = fullCenterScope
+    const commonRequest = realtimeBootstrap
+      ? realtimeSnapshot('commonAll')
+      : fullCenterScope
       ? getDocs(query(collection(db, 'commonCriteriaAssessments'), where('periodId', '==', periodId), limit(2000)))
       : professionalCenterScope
         ? getDocs(query(collection(db, 'commonCriteriaAssessments'), where('periodId', '==', periodId), where('departmentId', 'in', PROFESSIONAL_DEPARTMENT_IDS), limit(2000)))
@@ -1537,6 +1628,33 @@ function taskForCurrentUser(task) {
   return task.ownerUserId === KpiWorkflowState.user.uid || task.createdByUserId === KpiWorkflowState.user.uid;
 }
 function evaluationFor(taskId){ return KpiWorkflowState.evaluations.find(e => e.taskId === taskId); }
+
+/*
+ * V1.24.3: safety fallback cho TỰ ĐÁNH GIÁ.
+ * Nếu evaluation của chính người dùng chưa nằm trong state do scope màn hình rộng
+ * (Trưởng/Phó, acting, báo cáo...), chỉ đọc đúng evaluations của chính UID trong kỳ.
+ * Không full-scan; query này đã là fallback production hiện hữu và được Rules cho phép.
+ */
+async function loadOwnEvaluationForTask(taskId, { force = false } = {}) {
+  const existing = evaluationFor(taskId);
+  if (existing && !force) return existing;
+  const periodId = KpiWorkflowState.period?.id;
+  const ownerUserId = KpiWorkflowState.user?.uid;
+  if (!periodId || !ownerUserId || !taskId) return existing || null;
+
+  const snapshot = await getDocs(query(
+    collection(db, 'taskEvaluations'),
+    where('periodId', '==', periodId),
+    where('ownerUserId', '==', ownerUserId),
+    limit(300)
+  ));
+  const ownEvaluations = snapshot.docs.map(item => ({ id:item.id, ...item.data() }));
+  const merged = new Map(KpiWorkflowState.evaluations.map(item => [item.id, item]));
+  ownEvaluations.forEach(item => merged.set(item.id, item));
+  KpiWorkflowState.evaluations = [...merged.values()];
+  return KpiWorkflowState.evaluations.find(item => item.taskId === taskId && item.ownerUserId === ownerUserId) || null;
+}
+
 function milestonesForTask(taskId){ return KpiWorkflowState.milestones.filter(item => item.taskId === taskId && item.active !== false).sort((a,b)=>Number(a.sequence||0)-Number(b.sequence||0)||clean(a.dueDateKey).localeCompare(clean(b.dueDateKey))); }
 function hasNumericValue(value) {
   return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -2040,16 +2158,12 @@ function openPersonPlanDetail(uid) {
       groupHeader = `<tr class="kpi-registration-group-row"><td colspan="8"><div><strong>${esc(groupCode)} — ${esc(groupName)}</strong><span>${count} công việc cá nhân</span>${groupPending.length ? `<button class="kpi-button danger" type="button" data-reject-registration-group="${esc(key)}">Không duyệt cả nhóm</button>` : ''}</div></td></tr>`;
     }
     const canManagerCancel = item.kind === 'registration' && canCancelRegistrationAsManager(item);
-    const personalLabel = count > 1 ? (item.title || item.description || item.standardTaskName || '') : (item.standardTaskName || item.title || '');
-    const outputRequirement = clean(
-      item.kind === 'registration'
-        ? item.description
-        : (item.expectedOutput || item.description)
-    );
+    const personalLabel = clean(item.title) || clean(item.standardTaskName) || '';
+    const outputSnapshot = clean(item.description);
     return `${groupHeader}<tr>
       <td>${item.kind === 'registration' && item.status === 'PENDING' ? `<input type="checkbox" data-reg-review value="${esc(item.id)}" ${canApproveRegistration(item) ? 'checked' : 'disabled'}>` : '—'}</td>
       <td>${count > 1 ? `<span class="kpi-small">Công việc cá nhân ${Number(item.personalItemOrder || 0) || ''}</span><br>` : `<strong>${esc(item.standardTaskCode || item.taskCode || '')}</strong><br>`}${esc(personalLabel)}</td>
-      <td>${esc(outputRequirement || '—')}</td>
+      <td class="registration-plan-output">${outputSnapshot ? esc(outputSnapshot) : '<span class="kpi-muted">Chưa ghi kết quả đầu ra</span>'}</td>
       <td>${fmt(item.baseScore)}</td><td>${coefficientPercent(item.difficultyCoefficient)}</td><td>${fmt(item.maximumConvertedScore)}</td>
       <td>${esc(item.status === 'PENDING' ? 'Chờ duyệt' : item.status === 'REJECTED' ? 'Không duyệt' : item.planApprovalStatus === 'APPROVED' || item.status === 'APPROVED' ? 'Đã duyệt' : item.status || '')}</td>
       <td>${item.kind === 'registration' && item.status === 'PENDING' && canApproveRegistration(item)
@@ -2647,7 +2761,7 @@ async function openProductCatalog(userId = KpiWorkflowState.user.uid) {
       fileName:`Danh_muc_san_pham_${KpiWorkflowState.period?.id || 'ky'}_${safeDepartment}_${clean(user.fullName || 'ca_nhan')}.xlsx`,
       sheetName:'Danh mục sản phẩm', periodLabel, employeeName:clean(user.fullName || ''),
       employeePosition:userPositionWithDepartment(user), departmentName,
-      rows:tasks.map((task,index)=>({index:index+1,taskCode:task.taskCode||'',title:task.title||task.standardTaskName||'',outputRequirement:task.description||task.outputRequirement||task.standardTaskOutputRequirement||'',deadlineLabel:productCatalogDeadlineLabel(task),workTypeLabel:clean(task.workType).toUpperCase()==='DOT_XUAT'?'Đột xuất':'Thường xuyên',baseScore:Number(task.baseScore||0),coefficientLabel:coefficientPercent(task.difficultyCoefficient),maximumConvertedScore:Number(task.maximumConvertedScore||0),evidence:task.standardTaskMandatoryEvidence||task.mandatoryEvidence||'—'})),
+      rows:tasks.map((task,index)=>({index:index+1,title:task.title||task.standardTaskName||'',outputRequirement:task.description||task.outputRequirement||task.standardTaskOutputRequirement||'',deadlineLabel:productCatalogDeadlineLabel(task),workTypeLabel:clean(task.workType).toUpperCase()==='DOT_XUAT'?'Đột xuất':'Thường xuyên',baseScore:Number(task.baseScore||0),coefficientLabel:coefficientPercent(task.difficultyCoefficient),maximumConvertedScore:Number(task.maximumConvertedScore||0),evidence:task.standardTaskMandatoryEvidence||task.mandatoryEvidence||'—'})),
       exceededCount
     });
   });
@@ -2673,8 +2787,9 @@ function openDepartmentReport(options = {}) {
   const selector = canChooseDepartment
     ? `<div class="department-report-scope"><span>Phạm vi tổng hợp</span><div class="department-report-scope-options">${selectableDepartments.map(item => `<button type="button" class="department-report-scope-button ${item === defaultDepartment ? 'is-active' : ''}" data-department-report-scope="${esc(item)}">${esc(item === 'ALL' ? 'Toàn Trung tâm' : departmentDisplayName(item))}</button>`).join('')}</div></div>`
     : '';
-  const root = modal(options.title || 'Tổng hợp Phòng/Khu', `${selector}<div id="departmentReportContent"></div>`, '<button class="kpi-button secondary" data-kpi-close type="button">Đóng</button><button id="printDepartmentReport" class="kpi-button" type="button">🖨️ In báo cáo</button>');
+  const root = modal(options.title || 'Tổng hợp Phòng/Khu', `${selector}<div id="departmentReportContent"></div>`, '<button class="kpi-button secondary" data-kpi-close type="button">Đóng</button><button id="exportDepartmentReportXlsx" class="kpi-button secondary" type="button">📊 Xuất Excel (.xlsx)</button><button id="printDepartmentReport" class="kpi-button" type="button">🖨️ In báo cáo</button>');
   let selectedDepartmentId = defaultDepartment;
+  let currentWorkbookData = null;
 
   const renderDepartment = () => {
     const departmentId = normalizeDepartment(selectedDepartmentId || defaultDepartment);
@@ -2708,6 +2823,7 @@ function openDepartmentReport(options = {}) {
       return clean(user.cdtnRoleLabel) || 'Thành viên Chi đoàn';
     };
 
+    const workbookRows = [];
     const body = people.map((user, index) => {
       const data = isCdtnAggregate
         ? summaryForUserInDepartment(user.id, 'CDTN')
@@ -2733,17 +2849,47 @@ function openDepartmentReport(options = {}) {
         return `<tr><td>${index + 1}</td><td><strong>${esc(user.fullName || user.email || user.id)}</strong><br><span class="kpi-small">${esc(departmentDisplayName(user.departmentId))}</span></td><td>${esc(cdtnRoleName(user))}</td><td class="m01-center">${taskCount}${exemptTaskCount ? `<br><span class="kpi-small">${exemptTaskCount} miễn</span>` : ''}</td><td class="m01-center">${data.hasCalculationBasis ? fmt(data.A) : '0'}</td><td class="m01-center">${data.hasCalculationBasis ? fmt(data.B) : 'Chưa đủ cơ sở'}</td><td><span class="kpi-score-badge">${esc(stateLabel)}</span></td></tr>`;
       }
 
-      const taskBreakdown = `${professionalCount} chuyên môn · ${cdtnCount} Chi đoàn`;
+      const taskBreakdownParts = [];
+      if (professionalCount > 0) taskBreakdownParts.push(`${professionalCount} chuyên môn`);
+      if (cdtnCount > 0) taskBreakdownParts.push(`${cdtnCount} Chi đoàn`);
+      const taskBreakdown = taskBreakdownParts.join(' · ') || '—';
       const bonus = bonusSummaryForUser(user.id);
       const officialState = scoreStateForUserCombined(user.id).code === 'OFFICIAL';
-      const rating = data.hasCalculationBasis ? ratingForUser(user.id, data.total100, { officialOnly: officialState }) : { code:'NO_BASIS' };
+      const ratingSnapshot = ratingForUser(user.id, data.total100, { officialOnly: officialState });
+      const rating = data.hasCalculationBasis ? ratingSnapshot : { ...ratingSnapshot, code:'NO_BASIS' };
       const bonusDisplay = [
         bonus.approved > 0 ? `<strong>+${fmt(bonus.approved)}</strong><br><span class="kpi-small">Đã xác nhận</span>` : '',
         bonus.pending > 0 ? `<strong class="kpi-bonus-pending">+${fmt(bonus.pending)}</strong><br><span class="kpi-small">Chờ xác nhận</span>` : ''
       ].filter(Boolean).join('<br>') || '0';
-      return `<tr><td>${index + 1}</td><td><strong>${esc(user.fullName || user.email || user.id)}</strong><br><span class="kpi-small">${esc(departmentDisplayName(user.departmentId))}</span></td><td>${esc(user.position || '')}</td><td class="m01-center">${esc(taskBreakdown)}${exemptTaskCount ? `<br><span class="kpi-small">${exemptTaskCount} miễn</span>` : ''}</td><td class="m01-center">${data.hasCalculationBasis ? fmt(data.kpi70) : 'Chưa đủ cơ sở'}</td><td class="m01-center">${bonusDisplay}</td><td class="m01-center">${fmt(data.common30)}</td><td class="m01-center"><strong>${data.hasCalculationBasis ? fmt(data.total100) : '—'}</strong></td><td>${esc(ratingName(rating.code))}</td><td><span class="kpi-score-badge">${esc(stateLabel)}</span></td></tr>`;
+      // Cùng snapshot và helper với row HTML: export không query Firestore và không tính KPI lại.
+      workbookRows.push({
+        index: index + 1,
+        fullName: clean(user.fullName || user.email || user.id),
+        departmentName: departmentDisplayName(user.departmentId),
+        position: clean(user.position || ''),
+        taskBreakdown: `${taskBreakdown}${exemptTaskCount ? `\n${exemptTaskCount} miễn` : ''}`,
+        A: Number(data.A || 0), B: Number(data.B || 0),
+        kpi70: data.hasCalculationBasis ? Number(data.kpi70 || 0) : null,
+        exceededTasks: Number(rating.exceededTasks || 0),
+        bonusApproved: Number(bonus.approved || 0),
+        bonusPending: Number(bonus.pending || 0),
+        common30: Number(data.common30 || 0),
+        total100: data.hasCalculationBasis ? Number(data.total100 || 0) : null,
+        ratingName: ratingName(rating.code), scoreState: stateLabel
+      });
+      return `<tr><td>${index + 1}</td><td><strong>${esc(user.fullName || user.email || user.id)}</strong><br><span class="kpi-small">${esc(departmentDisplayName(user.departmentId))}</span></td><td>${esc(user.position || '')}</td><td class="m01-center">${esc(taskBreakdown)}${exemptTaskCount ? `<br><span class="kpi-small">${exemptTaskCount} miễn</span>` : ''}</td><td class="m01-center">${fmt(data.A)}</td><td class="m01-center">${fmt(data.B)}</td><td class="m01-center">${data.hasCalculationBasis ? fmt(data.kpi70) : 'Chưa đủ cơ sở'}</td><td class="m01-center"><strong>${Number(rating.exceededTasks || 0)}</strong></td><td class="m01-center">${bonusDisplay}</td><td class="m01-center">${fmt(data.common30)}</td><td class="m01-center"><strong>${data.hasCalculationBasis ? fmt(data.total100) : '—'}</strong></td><td>${esc(ratingName(rating.code))}</td><td><span class="kpi-score-badge">${esc(stateLabel)}</span></td></tr>`;
     }).join('');
 
+    currentWorkbookData = !isCdtnAggregate && people.length ? {
+      periodLabel: clean(KpiWorkflowState.period?.name || KpiWorkflowState.period?.id || ''),
+      scopeTitle: departmentId === 'ALL' ? 'Toàn Trung tâm' : departmentDisplayName(departmentId),
+      scopeId: departmentId,
+      periodId: clean(KpiWorkflowState.period?.id || 'ky'),
+      signerTitle: departmentId === 'ALL' ? 'BAN GIÁM ĐỐC' : 'TRƯỞNG PHÒNG/KHU',
+      rows: workbookRows
+    } : null;
+    const exportButton = root.querySelector('#exportDepartmentReportXlsx');
+    if (exportButton) exportButton.style.display = currentWorkbookData ? '' : 'none';
     const scopeTitle = departmentId === 'ALL' ? 'Toàn Trung tâm' : departmentDisplayName(departmentId);
     const reportHeading = isCdtnAggregate ? 'BẢNG TỔNG HỢP HOẠT ĐỘNG CHI ĐOÀN' : 'BẢNG TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ';
     const reportNote = isCdtnAggregate
@@ -2751,10 +2897,10 @@ function openDepartmentReport(options = {}) {
       : 'Kết quả đánh giá theo từng cá nhân trong kỳ.';
     const tableHead = isCdtnAggregate
       ? '<tr><th>STT</th><th>Họ và tên</th><th>Vai trò Chi đoàn</th><th>Nhiệm vụ Chi đoàn</th><th>Điểm kế hoạch (A)</th><th>Điểm thực tế (B)</th><th>Trạng thái đánh giá</th></tr>'
-      : '<tr><th>STT</th><th>Họ và tên</th><th>Chức vụ</th><th>Nhiệm vụ tính KPI</th><th>Điểm công việc</th><th>Điểm thưởng</th><th>Điểm tiêu chí chung</th><th>Tổng điểm</th><th>Mức xếp loại</th><th>Trạng thái điểm</th></tr>';
-    root.querySelector('#departmentReportContent').innerHTML = people.length ? `<div id="departmentReportPrint" class="department-report kpi-report-print">
+      : '<tr><th>STT</th><th>Họ và tên</th><th>Chức vụ</th><th>Nhiệm vụ tính KPI</th><th>Điểm kế hoạch<br>(A)</th><th>Điểm thực hiện<br>(B)</th><th>Điểm KPI công việc<br>(70)</th><th>Đầu việc<br>vượt</th><th>Điểm thưởng</th><th>Tiêu chí chung<br>(30)</th><th>Tổng điểm</th><th>Mức xếp loại</th><th>Trạng thái điểm</th></tr>';
+    root.querySelector('#departmentReportContent').innerHTML = people.length ? `<div id="departmentReportPrint" class="department-report kpi-report-print ${isCdtnAggregate ? 'department-report-cdtn' : 'department-report-kpi-summary'}">
       <div class="department-report-heading"><strong>TRUNG TÂM HỖ TRỢ XÃ HỘI</strong><h2>${reportHeading}</h2><p>${esc(KpiWorkflowState.period?.name || '')} · ${esc(scopeTitle)}</p><small>${esc(reportNote)}</small></div>
-      <div class="kpi-table-wrap"><table class="kpi-report-table department-report-table"><thead>${tableHead}</thead><tbody>${body}</tbody></table></div>
+      <div class="kpi-table-wrap"><table class="kpi-report-table department-report-table ${isCdtnAggregate ? '' : 'department-report-kpi-summary-table'}"><thead>${tableHead}</thead><tbody>${body}</tbody></table></div>
       <div class="department-report-signatures"><div><strong>NGƯỜI LẬP BIỂU</strong><br><em>(Ký, ghi rõ họ tên)</em></div><div><strong>${isCdtnAggregate ? 'BÍ THƯ/PHÓ BÍ THƯ CHI ĐOÀN' : departmentId === 'ALL' ? 'BAN GIÁM ĐỐC' : 'TRƯỞNG PHÒNG/KHU'}</strong><br><em>(Ký, ghi rõ họ tên)</em></div></div>
     </div>` : '<div class="kpi-empty">Chưa có dữ liệu đánh giá trong kỳ này.</div>';
   };
@@ -2764,7 +2910,37 @@ function openDepartmentReport(options = {}) {
     root.querySelectorAll('[data-department-report-scope]').forEach(item => item.classList.toggle('is-active', item === button));
     renderDepartment();
   }));
-  root.querySelector('#printDepartmentReport')?.addEventListener('click', () => window.print());
+  root.querySelector('#exportDepartmentReportXlsx')?.addEventListener('click', () => {
+    if (!canViewDepartmentReport() || !currentWorkbookData || !currentWorkbookData.rows.length) {
+      ModalService.alert('Phạm vi này chưa có dữ liệu Tổng hợp Phòng/Khu để xuất Excel.');
+      return;
+    }
+    try {
+      const snapshot = currentWorkbookData;
+      exportDepartmentSummaryWorkbook({
+        ...snapshot,
+        fileName: `Tong_hop_KPI_${snapshot.periodId}_${snapshot.scopeId}.xlsx`
+      });
+    } catch (error) {
+      console.error('Không thể xuất Excel Tổng hợp Phòng/Khu:', error);
+      ModalService.alert('Không thể tạo file Excel. Vui lòng thử lại hoặc báo quản trị.');
+    }
+  });
+  root.querySelector('#printDepartmentReport')?.addEventListener('click', () => {
+    const existingPageStyle = document.getElementById('departmentReportPrintPageStyle');
+    existingPageStyle?.remove();
+    const professionalSummary = normalizeDepartment(selectedDepartmentId || defaultDepartment) !== 'CDTN';
+    if (professionalSummary) {
+      const pageStyle = document.createElement('style');
+      pageStyle.id = 'departmentReportPrintPageStyle';
+      pageStyle.textContent = '@page { size: A4 landscape; margin: 10mm; }';
+      document.head.appendChild(pageStyle);
+    }
+    const cleanupPrintPageStyle = () => document.getElementById('departmentReportPrintPageStyle')?.remove();
+    window.addEventListener('afterprint', cleanupPrintPageStyle, { once:true });
+    window.addEventListener('focus', cleanupPrintPageStyle, { once:true });
+    window.print();
+  });
   renderDepartment();
 }
 
@@ -2855,7 +3031,7 @@ function openRegistrationGroup(userId) {
   const items = KpiWorkflowState.registrations.filter(r => r.userId === userId && r.status === 'PENDING');
   if (!items.length) return;
   const canApprove = items.some(canApproveRegistration);
-  const body = `<div class="registration-modal-tools"><button id="regSelectAll" class="kpi-button secondary" type="button">Chọn tất cả</button><button id="regClearAll" class="kpi-button secondary" type="button">Bỏ chọn tất cả</button></div><div class="registration-approval-list">${items.map(r=>`<div class="registration-approval-row"><input type="checkbox" data-reg-review value="${esc(r.id)}" ${canApproveRegistration(r)?'checked':'disabled'}><span><strong>${esc(r.standardTaskCode || '')} — ${esc(r.title || r.standardTaskName || '')}</strong>${r.title && r.title !== r.standardTaskName ? `<small>Danh mục chuẩn: ${esc(r.standardTaskName || '')}</small>` : ''}<small>Điểm tối đa: ${fmt(r.maximumConvertedScore)}</small></span>${canApproveRegistration(r) ? `<button class="kpi-button danger" type="button" data-reject-one-registration="${esc(r.id)}">Không duyệt</button>` : ''}</div>`).join('')}</div>`;
+  const body = `<div class="registration-modal-tools"><button id="regSelectAll" class="kpi-button secondary" type="button">Chọn tất cả</button><button id="regClearAll" class="kpi-button secondary" type="button">Bỏ chọn tất cả</button></div><div class="registration-approval-list">${items.map(r=>{ const outputSnapshot = clean(r.description); return `<div class="registration-approval-row"><input type="checkbox" data-reg-review value="${esc(r.id)}" ${canApproveRegistration(r)?'checked':'disabled'}><span><strong>${esc(r.standardTaskCode || '')} — ${esc(r.title || r.standardTaskName || '')}</strong>${r.title && r.title !== r.standardTaskName ? `<small>Danh mục chuẩn: ${esc(r.standardTaskName || '')}</small>` : ''}<small class="registration-approval-output"><strong>Kết quả đầu ra:</strong> ${outputSnapshot ? esc(outputSnapshot) : 'Chưa ghi kết quả đầu ra'}</small><small>Điểm tối đa: ${fmt(r.maximumConvertedScore)}</small></span>${canApproveRegistration(r) ? `<button class="kpi-button danger" type="button" data-reject-one-registration="${esc(r.id)}">Không duyệt</button>` : ''}</div>`; }).join('')}</div>`;
   const footer = canApprove ? '<button class="kpi-button secondary" data-kpi-close type="button">Đóng</button><button id="regRejectAll" class="kpi-button danger" type="button">Không duyệt toàn bộ</button><button id="regApproveSelected" class="kpi-button" type="button">Duyệt các mục đã chọn</button>' : '<button class="kpi-button secondary" data-kpi-close type="button">Đóng</button>';
   const root = modal(`Đăng ký của ${items[0].userName || ''}`, body, footer);
   root.querySelector('#regSelectAll')?.addEventListener('click',()=>root.querySelectorAll('[data-reg-review]:not(:disabled)').forEach(x=>x.checked=true));
@@ -3006,7 +3182,17 @@ function scoreBreakdownHtml(task, score, options = {}) {
 
 async function openSelfAssessment(taskId) {
   const task = KpiWorkflowState.tasks.find(t => t.id === taskId); if (!task) return;
-  const ev = evaluationFor(taskId) || {};
+  let ev = evaluationFor(taskId) || null;
+  if (!ev) {
+    try {
+      ev = await loadOwnEvaluationForTask(taskId);
+    } catch (error) {
+      if (!isPermissionDeniedError(error)) {
+        console.warn('Không thể nạp bổ sung hồ sơ tự đánh giá của chính người dùng:', error);
+      }
+    }
+  }
+  ev = ev || {};
   if (String(task.noOccurrenceStatus || '').toUpperCase() === 'CONFIRMED') {
     ModalService.alert('Đầu việc đã được xác nhận không phát sinh, đã loại khỏi A và không thực hiện chấm điểm.');
     return;
@@ -3167,28 +3353,91 @@ async function openSelfAssessment(taskId) {
     const bonusRequestReason = bonusRequested ? clean(el('kpiBonusRequestReason')?.value) : '';
     if (bonusRequested && !bonusRequestReason) { showSelfFormError('Vui lòng nêu căn cứ khi đề nghị điểm thưởng.', el('kpiBonusRequestReason')); return; }
     const bonusRequestedScore = bonusRequested ? calculateBonusScore(score.actual, 0.05) : 0;
-    const evaluationScope = taskScopeDepartmentId(task) || KpiWorkflowState.profile.departmentId || '';
-    const evaluationPayload = {
-      periodId: KpiWorkflowState.period.id, taskId: task.id, taskCode: task.taskCode || '', ownerUserId: KpiWorkflowState.user.uid, ownerName: KpiWorkflowState.profile.fullName || '', ownerRole: KpiWorkflowState.profile.role || '', departmentId: clean(ev.departmentId) || evaluationScope,
-      trackingMode: itemized ? 'ITEMIZED' : 'FINAL_OUTPUT', actualWorkItemCount: itemized ? workSummary.count : null, actualCompletedCount: itemized ? workSummary.completedCount : null, actualOnTimeCount: itemized ? workSummary.onTimeCount : null, actualQualifiedCount: itemized ? workSummary.qualifiedCount : null, actualProgressRate: itemized ? workSummary.actualProgressRate : null, actualResultRate: itemized ? workSummary.actualResultRate : null,
-      progressCalculationMode: recurring ? 'MILESTONE_AUTO' : eventDriven ? 'WORK_ITEM_AUTO' : 'DEADLINE_AUTO',
+    const evaluationScope = taskScopeDepartmentId(task) || profileDepartmentId() || '';
+    const existingEvaluationDepartmentId = normalizeDepartment(ev.departmentId);
+    const existingEvaluationHomeDepartmentId = normalizeDepartment(ev.homeDepartmentId);
+
+    // V1.24.2: Chi đoàn là một scope nghiệp vụ độc lập với Phòng/Khu chính.
+    // Không được kế thừa departmentId legacy của evaluation khi task hiện thuộc CDTN.
+    if (evaluationScope === 'CDTN' && !Permissions.isCdtnMember()) {
+      showSelfFormError('Tài khoản hiện chưa có vai trò Chi đoàn trong hồ sơ quyền. Vui lòng đồng bộ DANH MỤC TÀI KHOẢN (additionalRoles) rồi đăng nhập lại trước khi tự đánh giá nhiệm vụ Chi đoàn.');
+      return;
+    }
+    if (evaluationScope === 'CDTN' && ev.id && existingEvaluationDepartmentId !== 'CDTN') {
+      showSelfFormError('Hồ sơ tự đánh giá Chi đoàn này được tạo bởi phiên bản cũ với phạm vi không còn hợp lệ. Quản trị viên cần chạy bảo trì “V1.24.2 - Sửa scope tự đánh giá Chi đoàn” trước khi tiếp tục; hệ thống không tự xóa hoặc ghi đè lịch sử.');
+      return;
+    }
+
+    const evaluationDepartmentId = evaluationScope === 'CDTN'
+      ? 'CDTN'
+      : (existingEvaluationDepartmentId || evaluationScope);
+    const evaluationHomeDepartmentId = existingEvaluationHomeDepartmentId
+      || (evaluationScope === 'CDTN'
+        ? profileDepartmentId()
+        : normalizeDepartment(task.homeDepartmentId || profileDepartmentId()));
+
+    if (evaluationScope === 'CDTN' && !evaluationHomeDepartmentId) {
+      showSelfFormError('Không xác định được Phòng/Khu chính của tài khoản để lập hồ sơ tự đánh giá Chi đoàn. Vui lòng đồng bộ tài khoản trước khi thử lại.');
+      return;
+    }
+
+    const progressCalculationMode = recurring ? 'MILESTONE_AUTO' : eventDriven ? 'WORK_ITEM_AUTO' : 'DEADLINE_AUTO';
+    const selfAssessmentFields = {
+      progressCalculationMode,
       progressMilestoneDueCount: recurring ? milestoneSummary.dueMilestones : null,
       progressMilestoneAverageRate: recurring ? milestoneSummary.averageRate : null,
       progressCalculatedAt: serverTimestamp(),
       selfProgressRate: progress, selfResultRate: result, selfExecutionScore: score.execution, selfActualScore: score.actual, selfComment: comment,
-      confirmedProgressRate: null, confirmedResultRate: null, confirmedExecutionScore: null, confirmedActualScore: null, reviewerEmail: reviewer.email, reviewerUserId: reviewer.uid, reviewerName: reviewer.name,
+      confirmedProgressRate: null, confirmedResultRate: null, confirmedExecutionScore: null, confirmedActualScore: null,
+      reviewerEmail: reviewer.email, reviewerUserId: reviewer.uid, reviewerName: reviewer.name,
       isExceededRequirement: exceeded, exceededRequirementDescription: exceededText,
       confirmedExceededRequirement: null, exceededDecision: exceeded ? 'PENDING' : 'NOT_REQUESTED', exceededDecisionReason: '', exceededDecisionByUserId: '', exceededDecisionByName: '', exceededDecisionAt: null,
-      bonusRequested, bonusRequestType, bonusRequestReason, bonusRequestRate: bonusRequested ? 0.05 : 0, bonusRequestedBasisScore: bonusRequested ? score.actual : 0, bonusRequestedScore, bonusRequestedAt: bonusRequested ? serverTimestamp() : null,
-      bonusDecision: bonusRequested ? 'PENDING' : 'NOT_REQUESTED', bonusDecisionReason: '', bonusDecisionByUserId: '', bonusDecisionByName: '', bonusDecisionAt: null,
-      bonusAwarded: false, bonusType: '', bonusRate: 0, bonusBasisScore: 0, bonusScore: 0, bonusConfirmedByUserId: '', bonusConfirmedByName: '', bonusConfirmedAt: null,
-      ownerLeaderLevel: clean(KpiWorkflowState.profile.leaderLevel || ''), ownerAdditionalRoles: Array.isArray(KpiWorkflowState.profile.additionalRoles) ? KpiWorkflowState.profile.additionalRoles : [],
-      status: 'PENDING_REVIEW', formulaVersion: 'KPI_2026_PHU_LUC_4_AUTO_PROGRESS_V7', updatedAt: serverTimestamp(), createdAt: ev.createdAt || serverTimestamp()
+      bonusRequested, bonusRequestType, bonusRequestReason, bonusRequestRate: bonusRequested ? 0.05 : 0,
+      bonusRequestedBasisScore: bonusRequested ? score.actual : 0, bonusRequestedScore,
+      bonusRequestedAt: bonusRequested ? serverTimestamp() : null,
+      bonusDecision: bonusRequested ? 'PENDING' : 'NOT_REQUESTED', bonusDecisionReason: '',
+      bonusDecisionByUserId: '', bonusDecisionByName: '', bonusDecisionAt: null,
+      bonusAwarded: false, bonusType: '', bonusRate: 0, bonusBasisScore: 0, bonusScore: 0,
+      bonusConfirmedByUserId: '', bonusConfirmedByName: '', bonusConfirmedAt: null,
+      ownerLeaderLevel: clean(KpiWorkflowState.profile.leaderLevel || ''),
+      ownerAdditionalRoles: Array.isArray(KpiWorkflowState.profile.additionalRoles) ? KpiWorkflowState.profile.additionalRoles : [],
+      status: 'PENDING_REVIEW',
+      formulaVersion: 'KPI_2026_PHU_LUC_4_AUTO_PROGRESS_V7',
+      updatedAt: serverTimestamp()
     };
-    evaluationPayload.homeDepartmentId = clean(task.homeDepartmentId || KpiWorkflowState.profile.departmentId || '');
-    if (evaluationScope === 'CDTN') evaluationPayload.organizationId = 'CDTN';
+    const evaluationId = `${KpiWorkflowState.period.id}_${task.id}`;
+    const createPayload = {
+      periodId: KpiWorkflowState.period.id,
+      taskId: task.id,
+      taskCode: task.taskCode || '',
+      ownerUserId: KpiWorkflowState.user.uid,
+      ownerName: KpiWorkflowState.profile.fullName || '',
+      ownerRole: KpiWorkflowState.profile.role || '',
+      departmentId: evaluationDepartmentId,
+      homeDepartmentId: evaluationHomeDepartmentId,
+      trackingMode: itemized ? 'ITEMIZED' : 'FINAL_OUTPUT',
+      actualWorkItemCount: itemized ? workSummary.count : null,
+      actualCompletedCount: itemized ? workSummary.completedCount : null,
+      actualOnTimeCount: itemized ? workSummary.onTimeCount : null,
+      actualQualifiedCount: itemized ? workSummary.qualifiedCount : null,
+      actualProgressRate: itemized ? workSummary.actualProgressRate : null,
+      actualResultRate: itemized ? workSummary.actualResultRate : null,
+      ...selfAssessmentFields,
+      createdAt: serverTimestamp()
+    };
+    if (evaluationScope === 'CDTN') createPayload.organizationId = 'CDTN';
+
     try {
-      await setDoc(doc(db, 'taskEvaluations', `${KpiWorkflowState.period.id}_${task.id}`), evaluationPayload, { merge: true });
+      if (ev.id) {
+        /*
+         * V1.24.3: evaluation đã tồn tại dùng UPDATE hẹp đúng whitelist ownerEvaluationUpdateOnly().
+         * Không ghi lại task/owner/scope/createdAt/tracking snapshot, tránh biến một lần tự đánh giá
+         * thành thay đổi metadata hoặc bị Rules từ chối khi hồ sơ legacy thiếu các field actual*.
+         */
+        await updateDoc(doc(db, 'taskEvaluations', ev.id), selfAssessmentFields);
+      } else {
+        await setDoc(doc(db, 'taskEvaluations', evaluationId), createPayload);
+      }
     } catch (error) {
       console.error('KPI_SELF_ASSESSMENT_DENIED', {
         taskId: task.id,
@@ -3198,7 +3447,7 @@ async function openSelfAssessment(taskId) {
         currentRole: KpiWorkflowState.profile.role || '',
         leaderLevel: KpiWorkflowState.profile.leaderLevel || '',
         profileDepartmentId: profileDepartmentId(),
-        evaluationDepartmentId: evaluationPayload.departmentId,
+        evaluationDepartmentId,
         taskScopeDepartmentId: evaluationScope,
         scoringEnabled: task.scoringEnabled,
         active: task.active,
@@ -3209,9 +3458,14 @@ async function openSelfAssessment(taskId) {
       return;
     }
     try {
-      await audit('SUBMIT_SELF_ASSESSMENT', { taskId, trackingMode: itemized ? 'ITEMIZED' : 'FINAL_OUTPUT', progressCalculationMode: evaluationPayload.progressCalculationMode, actualWorkItemCount: itemized ? workSummary.count : null, selfExecutionScore: score.execution, selfActualScore: score.actual, bonusRequested, bonusRequestType, bonusRequestedScore });
+      await audit('SUBMIT_SELF_ASSESSMENT', { taskId, trackingMode: itemized ? 'ITEMIZED' : 'FINAL_OUTPUT', progressCalculationMode, actualWorkItemCount: itemized ? workSummary.count : null, selfExecutionScore: score.execution, selfActualScore: score.actual, bonusRequested, bonusRequestType, bonusRequestedScore });
     } catch (auditError) {
       console.warn('Đã lưu tự đánh giá nhưng chưa ghi được nhật ký KPI:', auditError);
+    }
+    try {
+      await loadOwnEvaluationForTask(task.id, { force:true });
+    } catch (refreshError) {
+      console.warn('Đã lưu tự đánh giá nhưng chưa refresh được state cá nhân; realtime sẽ đồng bộ lại:', refreshError);
     }
     closeModal(); scheduleKpiLiveRender();
   });
@@ -3935,6 +4189,7 @@ async function openReport() {
     }).join('');
     return `<tr class="m01-group-row"><td class="m01-center">${esc(group.code)}</td><td colspan="3"><strong>${esc(group.title)}</strong></td><td class="m01-center">${fmt(group.max)}</td><td class="m01-center">${fmt(groupSelf)}</td><td class="m01-center">${commonScore.official ? fmt(groupConfirmed) : ''}</td><td></td></tr>${rows}`;
   }).join('');
+
   const criterionExportRows = criteria.map(c => {
     const value = resultFor(c.code);
 
@@ -4068,7 +4323,7 @@ async function openReport() {
   const reportScoreSummary = scorecardSummaryData(KpiWorkflowState.user.uid, s);
   const excelHtml = `<div id="kpiExcelPreview" class="kpi-hidden"><div class="kpi-score-state ${scoreState.className}" data-kpi-report-score-state="excel"><span class="kpi-score-state-icon">${scoreState.code === 'OFFICIAL' ? '✓' : '✎'}</span><div><strong>${esc(scoreState.label)}</strong><span>${esc(scoreState.detail)}</span></div></div><div class="kpi-scorecard-desktop"><div class="kpi-table-wrap"><table class="kpi-table kpi-wide-table"><thead><tr><th>STT</th><th>Tên công việc</th><th>Điểm chuẩn</th><th>Hệ số độ khó</th><th>Điểm quy đổi tối đa</th><th>Tiến độ</th><th>Kết quả</th><th>Điểm thực hiện</th><th>Điểm quy đổi thực tế</th><th>Vượt yêu cầu</th><th>Minh chứng</th></tr></thead><tbody>${mine.map((t, i) => { const evaluation=evaluationFor(t.id); const applied=evaluationScoreSnapshot(evaluation); return `<tr><td>${i + 1}</td><td><strong>${esc(t.taskCode || '')}</strong><br>${esc(t.title)}</td><td>${fmt(t.baseScore)}</td><td>${coefficientPercent(t.difficultyCoefficient)}</td><td>${fmt(t.maximumConvertedScore)}</td><td>${applied.progressRate ?? ''}${applied.progressRate !== null ? '%' : ''}</td><td>${applied.resultRate ?? ''}${applied.resultRate !== null ? '%' : ''}</td><td>${applied.hasScore ? fmt(applied.executionScore) : ''}</td><td><strong>${applied.hasScore ? fmt(applied.convertedActualScore) : ''}</strong></td><td class="m01-center">${esc(scorecardExceededLabel(evaluation))}</td><td>${evidenceCellHtml(evidenceMap.get(t.id) || [], t)}</td></tr>`; }).join('')}</tbody></table>${scorecardSummaryTableHtml(reportScoreSummary)}</div></div><div class="kpi-scorecard-mobile">${mine.map(t=>{const evaluation=evaluationFor(t.id);const applied=evaluationScoreSnapshot(evaluation);const files=evidenceMap.get(t.id)||[];return `<article class="kpi-score-card"><strong>${esc(t.taskCode||'')} — ${esc(t.title||'')}</strong><div><span>Điểm chuẩn ${fmt(t.baseScore)}</span><span>Hệ số ${coefficientPercent(t.difficultyCoefficient)}</span><span>Tối đa ${fmt(t.maximumConvertedScore)}</span></div><div><span>Tiến độ ${applied.progressRate??'—'}%</span><span>Kết quả ${applied.resultRate??'—'}%</span><span>Điểm thực tế <b>${applied.hasScore?fmt(applied.convertedActualScore):'—'}</b></span></div><div><span>Vượt yêu cầu: <b>${esc(scorecardExceededLabel(evaluation)||'Không')}</b></span><span>Minh chứng: ${files.length} tệp</span></div></article>`}).join('')}${scorecardSummaryCardsHtml(reportScoreSummary)}</div></div>`;
 
-    const reportRoot = modal(
+  const reportRoot = modal(
     `Báo cáo KPI cá nhân · ${formLabel}`,
     `<div class="kpi-preview-tabs kpi-no-print">
       <button
@@ -4300,8 +4555,7 @@ async function openReport() {
 
           bonusScore:
             Number(
-              reportBonusPresentation
-                .displayBonus || 0
+              reportBonusC || 0
             ),
 
           bonusPending:
@@ -4403,8 +4657,7 @@ export async function renderKpiWorkflow(outlet, options = {}) {
     return;
   }
   mount();
-  await loadAll();
-  startKpiRealtime();
+  await loadAll({ realtimeBootstrap: true });
   if (options.openReport === true && KpiWorkflowState.period) {
     openReport();
   }

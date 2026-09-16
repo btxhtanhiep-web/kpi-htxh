@@ -1,13 +1,13 @@
 /** Giao diện quy trình điều chỉnh sau Hội đồng - V1.10.0. */
-import { UserContext } from "../../core/user-context.js?v=20260911.V1_23_1";
-import { Permissions } from "../../core/permissions.js?v=20260911.V1_23_1";
-import { FirebaseService } from "../../core/firebase-service.js?v=20260911.V1_23_1";
-import { PeriodReadService } from "../../services/period-read-service.js?v=20260911.V1_23_1";
-import { DepartmentReadService } from "../../services/department-read-service.js?v=20260911.V1_23_1";
-import { UserReadService } from "../../services/user-read-service.js?v=20260911.V1_23_1";
-import { DriveEvidenceService } from "../../services/drive-evidence-service.js?v=20260911.V1_23_1";
-import { CouncilAdjustmentService } from "../../services/council-adjustment-service.js?v=20260911.V1_23_1";
-import { ModalService } from "../../core/modal-service.js?v=20260911.V1_23_1";
+import { UserContext } from "../../core/user-context.js?v=20260916.V1_24_7_HTXH_1";
+import { Permissions } from "../../core/permissions.js?v=20260916.V1_24_7_HTXH_1";
+import { FirebaseService } from "../../core/firebase-service.js?v=20260916.V1_24_7_HTXH_1";
+import { PeriodReadService } from "../../services/period-read-service.js?v=20260916.V1_24_7_HTXH_1";
+import { DepartmentReadService } from "../../services/department-read-service.js?v=20260916.V1_24_7_HTXH_1";
+import { UserReadService } from "../../services/user-read-service.js?v=20260916.V1_24_7_HTXH_1";
+import { DriveEvidenceService } from "../../services/drive-evidence-service.js?v=20260916.V1_24_7_HTXH_1";
+import { CouncilAdjustmentService } from "../../services/council-adjustment-service.js?v=20260916.V1_24_7_HTXH_1";
+import { ModalService } from "../../core/modal-service.js?v=20260916.V1_24_7_HTXH_1";
 
 const PROFESSIONAL_DEPARTMENTS = Object.freeze(["TCKT", "CTXH", "KQLCS"]);
 
@@ -222,7 +222,7 @@ export async function openMyCouncilAdjustments() {
   const period = await PeriodReadService.getActive({ force: true });
   if (!period) return ModalService.alert("Chưa có kỳ đánh giá đang hoạt động.");
   const round = await CouncilAdjustmentService.getRound(period.id);
-  if (!round) return ModalService.alert("Phòng Tổ chức - Kế toán chưa mở đợt điều chỉnh sau Hội đồng.");
+  if (!round) return ModalService.alert("TCKT chưa mở đợt điều chỉnh sau Hội đồng.");
   const modal = openModal({
     title: "Yêu cầu điều chỉnh sau Hội đồng",
     subtitle: `${period.name || period.id} • ${user.fullName || user.email}`,
@@ -244,7 +244,7 @@ export async function openTchcCouncilManager() {
   const selected = new Set((round?.departmentIds || available.map(d => d.id || d.code)).map(upper));
   const modal = openModal({
     title: "Quản lý điều chỉnh sau Hội đồng",
-    subtitle: `${period.name || period.id} • Phòng Tổ chức - Kế toán mở/khóa đợt, Phòng/Khu xử lý nhân sự của mình`,
+    subtitle: `${period.name || period.id} • TCKT mở/khóa đợt, Phòng/Khu xử lý nhân sự của mình`,
     body: `<div class="council-round-state ${upper(round?.status).toLowerCase()}"><span>Trạng thái đợt</span><strong>${upper(round?.status) === "OPEN" ? "Đang mở điều chỉnh" : upper(round?.status) === "CLOSED" ? "Đã khóa sau Hội đồng" : "Chưa mở"}</strong></div>
       <div class="council-department-picker"><h3>Phòng/Khu được mở điều chỉnh</h3>${available.map(d => {
         const id = upper(d.id || d.code);
@@ -351,7 +351,7 @@ export async function openDepartmentCouncilManager() {
     UserReadService.listActive({ force: true })
   ]);
   if (!round || upper(round.status) !== "OPEN" || state?.enabled !== true) {
-    return ModalService.alert("Phòng Tổ chức - Kế toán chưa mở quyền điều chỉnh sau Hội đồng cho Phòng/Khu này.");
+    return ModalService.alert("TCKT chưa mở quyền điều chỉnh sau Hội đồng cho Phòng/Khu này.");
   }
   const users = allUsers.filter(user => user.active === true && upper(user.departmentId) === departmentId)
     .sort((a, b) => String(a.fullName || "").localeCompare(String(b.fullName || ""), "vi"));
