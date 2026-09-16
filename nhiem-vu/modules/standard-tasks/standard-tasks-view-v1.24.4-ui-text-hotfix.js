@@ -361,8 +361,8 @@ function preparePersonalRegistrationDetails(items = [], period = {}) {
       const row = document.createElement("article");
       row.className = "standard-personal-row";
       row.dataset.personalRow = rowId;
-      row.innerHTML = `<div class="standard-personal-row-head"><strong>${isFirst ? "Công việc cá nhân" : "Công việc bổ sung"}</strong>${isFirst ? "" : '<button type="button" class="icon-button danger" data-remove-personal-row aria-label="Xóa công việc">×</button>'}</div>
-        <label><span>Nội dung thực hiện</span><input data-personal-title maxlength="1000" value="${escapeHtml(values.title ?? item.name ?? "")}"></label>
+      row.innerHTML = `<div class="standard-personal-row-head"><strong>${isFirst ? "Đầu việc cá nhân" : "Đầu việc bổ sung"}</strong>${isFirst ? "" : '<button type="button" class="icon-button danger" data-remove-personal-row aria-label="Xóa công việc">×</button>'}</div>
+        <label><input data-personal-title aria-label="Đầu việc cá nhân" maxlength="1000" value="${escapeHtml(values.title ?? item.name ?? "")}"></label>
         <label><span>Kết quả đầu ra</span><textarea data-personal-description rows="2" maxlength="3000">${escapeHtml(values.description ?? item.outputRequirement ?? "")}</textarea></label>
         <div class="standard-personal-row-grid">
           <label><span>Chu kỳ/Tần suất</span><select data-personal-frequency>${personalFrequencyOptions(frequency)}</select></label>
@@ -425,7 +425,7 @@ function preparePersonalRegistrationDetails(items = [], period = {}) {
             if (!grouped && parentFixed) fixedDeadlineDateKey = parentFixed;
             if (!title) {
               titleInput?.focus();
-              throw new Error("Nội dung thực hiện không được để trống.");
+              throw new Error("Đầu việc cá nhân không được để trống.");
             }
             const effectivePeriodEndDate = parentFixed && parentFixed < String(period.endDate || "") ? parentFixed : period.endDate;
             const plan = deriveDeadlinePlan({
@@ -493,7 +493,7 @@ function prepareRejectedRegistrationEdit(registration, period = {}) {
     overlay.innerHTML = `<section class="modal-card standard-personalize-card" role="dialog" aria-modal="true">
       <div class="modal-header"><div><h2>Chỉnh sửa và đăng ký lại</h2><p>Lý do không duyệt: ${escapeHtml(registration.rejectionReason || "Không có ghi chú")}</p></div><button class="modal-x" type="button">×</button></div>
       <div class="modal-body"><div class="standard-personal-row">
-        <label><span>Nội dung thực hiện</span><input data-personal-title maxlength="1000" value="${escapeHtml(pseudo.name)}"></label>
+        <label><input data-personal-title aria-label="Đầu việc cá nhân" maxlength="1000" value="${escapeHtml(pseudo.name)}"></label>
         <label><span>Kết quả đầu ra</span><textarea data-personal-description rows="3" maxlength="3000">${escapeHtml(pseudo.outputRequirement)}</textarea></label>
         <div class="standard-personal-row-grid">
           <label><span>Chu kỳ/Tần suất</span><select data-personal-frequency>${personalFrequencyOptions(frequency)}</select></label>
@@ -520,7 +520,7 @@ function prepareRejectedRegistrationEdit(registration, period = {}) {
         const nextFrequency = canonicalFrequency(overlay.querySelector("[data-personal-frequency]")?.value || "") || "";
         const completionDeadline = String(overlay.querySelector("[data-personal-completion]")?.value || "").trim();
         const fixedDeadlineDateKey = String(overlay.querySelector("[data-personal-fixed-deadline]")?.value || "").trim();
-        if (!title) throw new Error("Nội dung thực hiện không được để trống.");
+        if (!title) throw new Error("Đầu việc cá nhân không được để trống.");
         const effectivePeriodEndDate = pseudo.deadlineCeilingDateKey && pseudo.deadlineCeilingDateKey < String(period.endDate || "")
           ? pseudo.deadlineCeilingDateKey
           : period.endDate;
