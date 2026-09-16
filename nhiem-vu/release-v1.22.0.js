@@ -9,7 +9,7 @@ export const RELEASE_V1220 = Object.freeze({
     "Hiển thị ngay tệp minh chứng đã chọn trước khi lưu, giữ cơ chế staged upload và Drive hiện hữu.",
     "Ẩn entry point Giao nhiệm vụ đột xuất với Ban Giám đốc; giữ nguyên workflow cho Trưởng/Phó Phòng/Khu.",
     "Khôi phục phân công người thực hiện Chỉ đạo sau khi Phòng/Khu tiếp nhận; không bypass đơn vị nhận.",
-    "TCHC được ghi nhận/chuyển tải chỉ đạo miệng của BGĐ đến Phòng/Khu hợp lệ, đồng thời bảo toàn actor/audit và không tự bật KPI.",
+    "TCKT được ghi nhận/chuyển tải chỉ đạo miệng của BGĐ đến Phòng/Khu hợp lệ, đồng thời bảo toàn actor/audit và không tự bật KPI.",
     "Chuẩn hóa KPI Chi đoàn: Bí thư quản lý danh mục; Bí thư tự duyệt đăng ký của mình nhưng BGĐ xác nhận điểm cuối; Phó/BCH có thể nhận ủy quyền hợp lệ.",
     "Chuẩn hóa ủy quyền danh mục theo business position + unit/scope, không dùng ADMIN làm quyền nghiệp vụ thay thế.",
     "Tối ưu giao diện mobile/PWA theo giao diện hiện tại, giữ desktop và toàn bộ business workflow.",

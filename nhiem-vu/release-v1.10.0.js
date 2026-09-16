@@ -324,7 +324,7 @@ function injectCouncilButtons() {
       anchor.prepend(toolbar);
     }
     const buttons = [];
-    if (Permissions.isDepartmentHead(user) && upper(user.departmentId) === "TCHC") {
+    if (Permissions.isDepartmentHead(user) && upper(user.departmentId) === "TCKT") {
       buttons.push('<button id="v110OpenCouncilRound" class="secondary-button" type="button">⚙ Quản lý điều chỉnh sau Hội đồng</button>');
     }
     if (Permissions.isDepartmentHead(user)) {

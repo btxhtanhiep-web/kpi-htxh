@@ -6,7 +6,7 @@ export const RELEASE_V1_19_0 = Object.freeze({
   build: BUILD_VERSION,
   name: "V1.19.0 – Unit Authority & KPI Workflow Hardening",
   changes: [
-    "Chuẩn hóa Quyền phê duyệt tại đơn vị theo approvalAuthority, áp dụng chung cho mọi Phòng/Khu, không hard-code TCHC.",
+    "Chuẩn hóa Quyền phê duyệt tại đơn vị theo approvalAuthority, áp dụng chung cho mọi Phòng/Khu, không hard-code TCKT.",
     "Người phụ trách đơn vị giữ quyền gốc; Phó được ủy quyền có quyền bổ sung nhưng không được tự duyệt chính mình.",
     "Phó Trưởng phòng được gán approvalAuthority=HEAD được xử lý như người phụ trách đơn vị; khi tự chấm KPI phải chuyển lên Ban Giám đốc.",
     "Sửa nested modal để hộp xác nhận luôn nằm trên modal nhiệm vụ/KPI, chấm dứt trạng thái Đang lưu do hộp xác nhận bị che.",
