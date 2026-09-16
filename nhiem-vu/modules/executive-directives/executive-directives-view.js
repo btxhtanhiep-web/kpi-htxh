@@ -1,10 +1,10 @@
-import { UserContext } from "../../core/user-context.js?v=20260911.V1_23_1";
-import { Permissions } from "../../core/permissions.js?v=20260911.V1_23_1";
-import { ToastService } from "../../core/toast-service.js?v=20260911.V1_23_1";
-import { ModalService } from "../../core/modal-service.js?v=20260911.V1_23_1";
-import { DepartmentReadService } from "../../services/department-read-service.js?v=20260911.V1_23_1";
-import { UserReadService } from "../../services/user-read-service.js?v=20260911.V1_23_1";
-import { ExecutiveDirectiveService } from "../../services/executive-directive-service.js?v=20260911.V1_23_1";
+import { UserContext } from "../../core/user-context.js?v=20260916.V1_24_7_HTXH_1";
+import { Permissions } from "../../core/permissions.js?v=20260916.V1_24_7_HTXH_1";
+import { ToastService } from "../../core/toast-service.js?v=20260916.V1_24_7_HTXH_1";
+import { ModalService } from "../../core/modal-service.js?v=20260916.V1_24_7_HTXH_1";
+import { DepartmentReadService } from "../../services/department-read-service.js?v=20260916.V1_24_7_HTXH_1";
+import { UserReadService } from "../../services/user-read-service.js?v=20260916.V1_24_7_HTXH_1";
+import { ExecutiveDirectiveService } from "../../services/executive-directive-service.js?v=20260916.V1_24_7_HTXH_1";
 
 let state = {
   directives: [],
@@ -485,7 +485,7 @@ function renderReportTab(root) {
   const user = UserContext.requireUser();
   const canCenter = Permissions.canGenerateCenterExecutiveReports();
   const canDepartmentReport = canCenter || (upper(user.role) === "DEPARTMENT_LEADER" && Boolean(user.departmentId));
-  if (!canDepartmentReport) { root.innerHTML = emptyState("Chỉ Trưởng/Phó Phòng/Khu, BGĐ và Phòng Tổ chức - Kế toán được lập báo cáo tuần Chỉ đạo điều hành."); return; }
+  if (!canDepartmentReport) { root.innerHTML = emptyState("Chỉ Trưởng/Phó Phòng/Khu, BGĐ và TCKT được lập báo cáo tuần Chỉ đạo điều hành."); return; }
   const start = state.report?.weekStart || defaultReportWeekStart();
   const scope = canCenter ? (state.report?.departmentId || state.department || "ALL") : user.departmentId;
   root.innerHTML = `<section class="directive-report-builder"><div class="directive-report-controls"><label><span>Tuần bắt đầu từ thứ Hai</span><input id="directiveReportWeek" type="date" value="${esc(start)}"></label><label><span>Phạm vi báo cáo</span><select id="directiveReportDepartment" ${canCenter ? "" : "disabled"}>${canCenter ? `<option value="ALL" ${scope === "ALL" ? "selected" : ""}>Toàn Trung tâm</option>${targetDepartments().map(dep => { const id = upper(dep.id || dep.code); return `<option value="${esc(id)}" ${id === upper(scope) ? "selected" : ""}>${esc(dep.name || id)}</option>`; }).join("")}` : `<option value="${esc(user.departmentId)}">${esc(departmentName(user.departmentId))}</option>`}</select></label><button id="btnBuildDirectiveReport" class="primary-button" type="button">Tổng hợp báo cáo</button><button id="btnLoadSavedDirectiveReport" class="secondary-button" type="button">Mở bản đã lưu</button></div><div id="directiveReportResult">${state.report ? renderReport(state.report) : '<div class="directive-report-placeholder">Chọn tuần và bấm <strong>Tổng hợp báo cáo</strong>.</div>'}</div></section>`;
@@ -752,11 +752,11 @@ function openOralDirectiveForm() {
     <div class="modal-body directive-form-grid">
       <label><span>Ngày chỉ đạo</span><input id="oralDirectedDate" type="date" value="${esc(localDateKey())}"></label>
       <label><span>Người chỉ đạo</span><select id="oralDirectedBy"><option value="">-- Chọn Ban Giám đốc --</option>${directors.map(item => `<option value="${esc(item.id || item.uid)}" data-name="${esc(item.fullName || item.email)}">${esc(directorLabel(item))}</option>`).join("")}</select></label>
-      <label class="field-full"><span>Phòng/Khu thực hiện</span><select id="oralLeadDepartment" ${tchcRelay ? "" : "disabled"}>${selectableDepartments.map(item => { const id = upper(item.id || item.code); return `<option value="${esc(id)}" ${id === defaultDepartmentId ? "selected" : ""}>${esc(item.name || item.departmentName || id)}</option>`; }).join("")}</select><small>${tchcRelay ? "Phòng Tổ chức - Kế toán được ghi nhận/chuyển tải chỉ đạo miệng của BGĐ đến Phòng/Khu hợp lệ. Đơn vị nhận vẫn phải xác nhận tiếp nhận." : "Trưởng/Phụ trách chỉ ghi nhận chỉ đạo miệng cho đúng đơn vị của mình."}</small></label>
+      <label class="field-full"><span>Phòng/Khu thực hiện</span><select id="oralLeadDepartment" ${tchcRelay ? "" : "disabled"}>${selectableDepartments.map(item => { const id = upper(item.id || item.code); return `<option value="${esc(id)}" ${id === defaultDepartmentId ? "selected" : ""}>${esc(item.name || item.departmentName || id)}</option>`; }).join("")}</select><small>${tchcRelay ? "TCKT được ghi nhận/chuyển tải chỉ đạo miệng của BGĐ đến Phòng/Khu hợp lệ. Đơn vị nhận vẫn phải xác nhận tiếp nhận." : "Trưởng/Phụ trách chỉ ghi nhận chỉ đạo miệng cho đúng đơn vị của mình."}</small></label>
       <label class="field-full"><span>Nội dung chỉ đạo</span><textarea id="oralContent" rows="4" maxlength="3000" placeholder="Nhập đúng nội dung Ban Giám đốc đã chỉ đạo"></textarea></label>
       <label><span>Thời hạn hoàn thành</span><input id="oralDueDate" type="date"></label>
       <label><span>Mức độ</span><select id="oralPriority"><option value="NORMAL">Bình thường</option><option value="URGENT">Khẩn</option><option value="VERY_URGENT">Rất khẩn</option></select></label>
-      <label class="field-full"><span>Ghi chú/nguồn</span><input id="oralReference" maxlength="1000" placeholder="Ví dụ: Giám đốc trao đổi trực tiếp tại Phòng Tổ chức - Kế toán"></label>
+      <label class="field-full"><span>Ghi chú/nguồn</span><input id="oralReference" maxlength="1000" placeholder="Ví dụ: Giám đốc trao đổi trực tiếp tại Phòng TCKT"></label>
       <div class="field-full info-banner compact-info-banner"><strong>Nguyên tắc</strong><span>Người nhập hệ thống vẫn là tài khoản đang thao tác. Chức năng này chỉ ghi nhận/chuyển tải chỉ đạo BGĐ, không làm người nhập trở thành BGĐ và không tự đưa nội dung vào KPI.</span></div>
     </div>
     <div class="modal-footer"><button class="secondary-button" type="button" data-directive-close>Hủy</button><button id="btnSaveOralDirective" class="primary-button" type="button">Ghi nhận chỉ đạo</button></div>
