@@ -30,7 +30,7 @@ function normalizeWord(token) {
   const acronym = ACRONYM_MAP.get(lower);
   if (acronym) return acronym;
 
-  // Mã hành chính/ký hiệu có cả chữ và số: QĐ366, NĐ30, TCHC01...
+  // Mã hành chính/ký hiệu có cả chữ và số: QĐ366, NĐ30, TCKT01...
   if (/\d/u.test(token) && /\p{L}/u.test(token)) return upper;
 
   const letters = [...token];

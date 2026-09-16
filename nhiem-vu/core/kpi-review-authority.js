@@ -3,7 +3,7 @@
  *
  * Nguyên tắc:
  * - Quyền phê duyệt đơn vị lấy từ approvalAuthority=HEAD (leaderLevel chỉ là lớp tương thích).
- * - Không hard-code TCKT/CTXH/KQLCS: mọi Phòng/Khu dùng cùng một authority resolver.
+ * - Không hard-code TCKT/YT/KHTC/CTXH: mọi Phòng/Khu dùng cùng một authority resolver.
  * - Ủy quyền BỔ SUNG quyền cho cấp phó, không làm mất quyền gốc của người phụ trách đơn vị.
  * - Người có quyền phê duyệt đơn vị tự chấm phải chuyển lên Ban Giám đốc.
  * - SELF REQUEST != FINAL APPROVAL: không ai tự xác nhận điểm/điểm thưởng của chính mình.
