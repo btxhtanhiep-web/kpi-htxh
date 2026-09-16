@@ -1,14 +1,21 @@
 /**
- * OneSignal Web Push is intentionally disabled for this 60-user tenant.
- * Source placeholder is retained so notification can be re-enabled later by configuration,
- * without affecting KPI/task business logic while disabled.
+ * V1.24.1 — ONESIGNAL OFF.
+ * Adapter no-op để tránh đăng ký OneSignal/subscription nếu file bị gọi ngoài ý muốn.
  */
-window.OneSignalDeferred = window.OneSignalDeferred || [];
-window.TaskPush = Object.freeze({
-  async initialize() { return { enabled: false, reason: "NOTIFICATIONS_DISABLED" }; },
-  async getSubscriptionSnapshot() { return { enabled: false, subscriptionId: "", providerKey: "" }; },
-  async logout() { return true; },
-  async requestPermission() { return false; },
-  async setEnabled() { return false; },
-  async sync() { return false; }
-});
+(() => {
+  const snapshot = Object.freeze({
+    subscriptionId: "",
+    optedIn: false,
+    permission: "disabled",
+    oneSignalId: "",
+    pushProviderKey: "DISABLED",
+    pushOrigin: window.location.origin,
+    oneSignalAppId: ""
+  });
+  window.TaskPush = Object.freeze({
+    async identify() { return false; },
+    async logout() { return true; },
+    async requestPermission() { return false; },
+    async getSubscriptionSnapshot() { return snapshot; }
+  });
+})();

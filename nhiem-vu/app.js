@@ -700,18 +700,40 @@ const DEPARTMENT_ID_ALIASES = Object.freeze({
   "BAN GIÁM ĐỐC": "BGD",
 
   "TCKT": "TCKT",
-  "PHONG TO CHUC KE TOAN": "TCKT",
-  "PHÒNG TỔ CHỨC KẾ TOÁN": "TCKT",
-  "PHONG TO CHUC - KE TOAN": "TCKT",
-  "PHÒNG TỔ CHỨC - KẾ TOÁN": "TCKT",
+  "PHONG TO CHUC HANH CHINH": "TCKT",
+  "PHÒNG TỔ CHỨC HÀNH CHÍNH": "TCKT",
+  "PHONG TO CHUC - HANH CHINH": "TCKT",
+  "PHÒNG TỔ CHỨC - HÀNH CHÍNH": "TCKT",
+  "PHONG TO CHUC – HANH CHINH": "TCKT",
+  "PHÒNG TỔ CHỨC – HÀNH CHÍNH": "TCKT",
 
   "CTXH": "CTXH",
   "PHONG CONG TAC XA HOI": "CTXH",
   "PHÒNG CÔNG TÁC XÃ HỘI": "CTXH",
 
-  "KQLCS": "KQLCS",
-  "KHU QUAN LY CHAM SOC DOI TUONG": "KQLCS",
-  "KHU QUẢN LÝ CHĂM SÓC ĐỐI TƯỢNG": "KQLCS"
+  "KHTC": "KHTC",
+  "PHONG KE HOACH TAI CHINH": "KHTC",
+  "PHÒNG KẾ HOẠCH TÀI CHÍNH": "KHTC",
+  "PHONG KE HOACH - TAI CHINH": "KHTC",
+  "PHÒNG KẾ HOẠCH - TÀI CHÍNH": "KHTC",
+  "PHONG KE HOACH – TAI CHINH": "KHTC",
+  "PHÒNG KẾ HOẠCH – TÀI CHÍNH": "KHTC",
+
+  "YT": "YT",
+  "PHONG Y TE": "YT",
+  "PHÒNG Y TẾ": "YT",
+
+  "KI": "KI",
+  "KHU I": "KI",
+  "KHU 1": "KI",
+
+  "KII": "KII",
+  "KHU II": "KII",
+  "KHU 2": "KII",
+
+  "KIII": "KIII",
+  "KHU III": "KIII",
+  "KHU 3": "KIII"
 });
 
 function departmentAliasKey(value) {
@@ -1022,9 +1044,10 @@ async function loadProfile(user) {
 }
 
 async function loadReferenceData() {
-  const [departmentSnapshot, userSnapshot] = await Promise.all([
+  const [departmentSnapshot, userSnapshot, khtcSnapshot] = await Promise.all([
     getDocsFromServer(collection(db, "departments")),
-    getDocsFromServer(collection(db, "users"))
+    getDocsFromServer(collection(db, "users")),
+    getDoc(doc(db, "departments", "KHTC"))
   ]);
 
   const departmentMap = new Map();
@@ -1040,6 +1063,16 @@ async function loadReferenceData() {
     }
   });
 
+  if (khtcSnapshot.exists()) {
+    const data = khtcSnapshot.data();
+
+    if (data.active !== false) {
+      departmentMap.set("KHTC", {
+        id: "KHTC",
+        ...data
+      });
+    }
+  }
 
   state.departments = Array.from(departmentMap.values())
     .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
@@ -2599,7 +2632,7 @@ function exportTaskReport() {
       </div>
 
       <main class="report-page">
-        <p class="agency-name">Trung tâm Bảo trợ xã hội Tân Hiệp</p>
+        <p class="agency-name">Trung tâm Hỗ trợ xã hội</p>
         <div class="agency-line"></div>
 
         <h1 class="report-heading">Báo cáo theo dõi thực hiện nhiệm vụ</h1>
@@ -2670,7 +2703,7 @@ function exportTaskReport() {
         <footer class="report-footer">
           <div class="footer-note">
             Báo cáo được tạo tự động từ Hệ thống Quản lý nhiệm vụ
-            của Trung tâm Bảo trợ xã hội Tân Hiệp.
+            của Trung tâm Hỗ trợ xã hội.
           </div>
 
           <div class="signature-block">
