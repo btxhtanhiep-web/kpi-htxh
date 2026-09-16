@@ -17,7 +17,7 @@
  * - Có 3 CDN dự phòng; không ảnh hưởng luồng ứng dụng nếu export không dùng.
  */
 
-const EXPORTER_VERSION = '20260913.M01_XLSX_1';
+const EXPORTER_VERSION = '20260916.V1_24_7_HTXH_1';
 
 const EXCELJS_URLS = Object.freeze([
   'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',
@@ -141,11 +141,15 @@ async function fetchTemplate(config) {
   const url = new URL(`../templates/${config.templateFile}`, import.meta.url);
   url.searchParams.set('v', EXPORTER_VERSION);
 
-  const response = await fetch(url.toString(), { cache: 'force-cache' });
+  const response = await fetch(url.toString(), { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`Không tải được template ${config.templateFile} (${response.status}).`);
   }
-  return response.arrayBuffer();
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b || bytes[2] !== 0x03 || bytes[3] !== 0x04) {
+    throw new Error(`Template ${config.templateFile} không phải tệp XLSX (ZIP) hợp lệ.`);
+  }
+  return bytes;
 }
 
 function setCellValue(sheet, address, value) {
@@ -212,7 +216,12 @@ export async function exportM01TemplateWorkbook({
   const templateBuffer = await fetchTemplate(config);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(templateBuffer);
+  try {
+    await workbook.xlsx.load(templateBuffer);
+  } catch (error) {
+    console.error('[HTXH M01] Không đọc được template Excel:', config.templateFile, error);
+    throw new Error(`Không đọc được Mẫu ${normalizedForm}. Kiểm tra cấu trúc XLSX: ${error?.message || error}`);
+  }
 
   const sheet = workbook.getWorksheet(config.sheetName) || workbook.worksheets[0];
   if (!sheet) {
@@ -301,16 +310,25 @@ export async function exportM01TemplateWorkbook({
     setCellValue(
       sheet,
       `H${config.bonusRow}`,
-      current ? `${current} (Chưa xác nhận)` : 'Chưa xác nhận'
+      current ? `${current} (đã xác nhận); còn đề nghị chưa duyệt` : 'Điểm thưởng đề nghị chưa xác nhận'
     );
   }
 
-  // Tổng A+B+C.
+  // Tổng A+B+C: template gốc có công thức F40/F39 chỉ A+B nên khắc phục
+  // nhất quán với chỉ số chính thức trong snapshot; không cộng bonus PENDING.
+  // Không tự tạo điểm khi chưa có cơ sở tính KPI.
   if (totalScore === '' || totalScore === null || totalScore === undefined) {
     setCellValue(sheet, `G${config.grandTotalRow}`, '');
+    setCellValue(sheet, `F${config.grandTotalRow}`, '');
   } else {
     setScoreCell(sheet, `G${config.grandTotalRow}`, totalScore);
+    // Ô F là cột tự đánh giá trong template; không được giữ công thức A+B sai nhãn A+B+C.
+    setCellValue(sheet, `F${config.grandTotalRow}`, '');
   }
+  sheet.pageSetup = {
+    ...(sheet.pageSetup || {}),
+    paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0
+  };
 
   // Tự đề xuất xếp loại.
   setCellValue(

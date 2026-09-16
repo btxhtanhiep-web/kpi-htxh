@@ -1,12 +1,12 @@
-import { FirebaseService } from "../core/firebase-service.js?v=20260911.V1_23_1";
-import { UserContext } from "../core/user-context.js?v=20260911.V1_23_1";
-import { Permissions } from "../core/permissions.js?v=20260911.V1_23_1";
-import { TaskLogService } from "./task-log-service.js?v=20260911.V1_23_1";
-import { StandardTaskReadService } from "./standard-task-read-service.js?v=20260911.V1_23_1";
-import { PeriodReadService } from "./period-read-service.js?v=20260911.V1_23_1";
-import { UserNotificationService } from "./user-notification-service.js?v=20260911.V1_23_1";
-import { APP_VERSION } from "../core/app-version.js?v=20260911.V1_23_1";
-import { deriveDeadlinePlan, deadlineDateFromKey, isDateKey, requiresManualDeadline, isEventDrivenFrequency, canonicalFrequency } from "../core/deadline-engine.js?v=20260911.V1_23_1";
+import { FirebaseService } from "../core/firebase-service.js?v=20260916.V1_24_7_HTXH_1";
+import { UserContext } from "../core/user-context.js?v=20260916.V1_24_7_HTXH_1";
+import { Permissions } from "../core/permissions.js?v=20260916.V1_24_7_HTXH_1";
+import { TaskLogService } from "./task-log-service.js?v=20260916.V1_24_7_HTXH_1";
+import { StandardTaskReadService } from "./standard-task-read-service.js?v=20260916.V1_24_7_HTXH_1";
+import { PeriodReadService } from "./period-read-service.js?v=20260916.V1_24_7_HTXH_1";
+import { UserNotificationService } from "./user-notification-service.js?v=20260916.V1_24_7_HTXH_1";
+import { APP_VERSION } from "../core/app-version.js?v=20260916.V1_24_7_HTXH_1";
+import { deriveDeadlinePlan, deadlineDateFromKey, isDateKey, requiresManualDeadline, isEventDrivenFrequency, canonicalFrequency } from "../core/deadline-engine.js?v=20260916.V1_24_7_HTXH_1";
 
 const clean = value => String(value ?? "").trim();
 const upper = value => clean(value).toUpperCase();
@@ -242,10 +242,17 @@ function taskDocumentCancellable(task, user, registration = null) {
   const scoringStatus = upper(task.scoringStatus);
   const planApprovalStatus = upper(task.planApprovalStatus);
 
+  const registrationIsAutoApproved = !registration || (
+    registration.autoApproved === true
+    && clean(registration.approvedByUserId) === user.uid
+  );
+
   return (
+    registrationIsAutoApproved &&
     Number(task.progress || 0) === 0 &&
-    ["MOI_TIEP_NHAN", "CHO_PHAN_CONG", "DA_PHAN_CONG", "DANG_XU_LY"].includes(status) &&
-    ["", "DA_PHAN_CONG", "DA_TIEP_NHAN"].includes(assignmentStatus) &&
+    ["MOI_TIEP_NHAN", "DA_PHAN_CONG"].includes(status) &&
+    assignmentStatus === "DA_PHAN_CONG" &&
+    emptyTaskField(task.acceptedAt) &&
     ["", "APPROVED"].includes(planApprovalStatus) &&
     emptyTaskField(task.completedAt) &&
     emptyTaskField(task.result) &&
@@ -256,7 +263,10 @@ function taskDocumentCancellable(task, user, registration = null) {
     emptyTaskField(task.evidenceFileName) &&
     emptyTaskField(task.evidenceStoragePath) &&
     emptyTaskField(task.pendingAdjustmentId) &&
+    Number(task.eventWorkItemCount || 0) === 0 &&
+    Number(task.milestoneCompletedCount || 0) === 0 &&
     emptyTaskField(task.confirmedActualScore) &&
+    emptyTaskField(task.preCouncilConfirmedActualScore) &&
     task.scoreLocked !== true &&
     ["", "NOT_ASSESSED"].includes(scoringStatus) &&
     !["CONFIRMED", "REQUESTED"].includes(upper(task.noOccurrenceStatus))
@@ -270,46 +280,66 @@ async function canCancelApprovedOwnRegistration(user, registration) {
 async function cancellationBlockers(task, registration, user) {
   const periodId = clean(task?.periodId || registration?.periodId);
   const departmentId = registrationDepartmentId(registration || task);
-  const [workItemsSnapshot, evaluationsSnapshot, adjustmentsSnapshot, plan, activeEvaluationPeriod] = await Promise.all([
+  const taskId = clean(task?.id || registration?.taskId);
+  if (!taskId) throw new Error("Không xác định được nhiệm vụ cần kiểm tra trước khi hủy.");
+
+  /*
+   * V1.24.4: đây là revalidation authoritative khi người dùng thật sự bấm Hủy.
+   * Query theo đúng taskId + owner/user để không quét toàn bộ dữ liệu cá nhân và để Rules
+   * có đủ ràng buộc chứng minh phạm vi đọc. Render UI không gọi các query blocker này.
+   */
+  const [workItemsSnapshot, evidenceSnapshot, evaluationsSnapshot, adjustmentsSnapshot, plan, activeEvaluationPeriod] = await Promise.all([
     FirebaseService.getDocs(
       FirebaseService.query(
         FirebaseService.collection(FirebaseService.db, "taskWorkItems"),
-        FirebaseService.where("ownerUserId", "==", user.uid)
+        FirebaseService.where("taskId", "==", taskId),
+        FirebaseService.where("ownerUserId", "==", user.uid),
+        FirebaseService.limit(1)
       )
     ),
-    periodId
-      ? FirebaseService.getDocs(
-          FirebaseService.query(
-            FirebaseService.collection(FirebaseService.db, "taskEvaluations"),
-            FirebaseService.where("periodId", "==", periodId),
-            FirebaseService.where("ownerUserId", "==", user.uid)
-          )
-        )
-      : Promise.resolve({ docs: [] }),
+    FirebaseService.getDocs(
+      FirebaseService.query(
+        FirebaseService.collection(FirebaseService.db, "taskEvidenceFiles"),
+        FirebaseService.where("taskId", "==", taskId),
+        FirebaseService.where("ownerUserId", "==", user.uid),
+        FirebaseService.limit(1)
+      )
+    ),
+    FirebaseService.getDocs(
+      FirebaseService.query(
+        FirebaseService.collection(FirebaseService.db, "taskEvaluations"),
+        FirebaseService.where("taskId", "==", taskId),
+        FirebaseService.where("ownerUserId", "==", user.uid),
+        FirebaseService.limit(1)
+      )
+    ),
     FirebaseService.getDocs(
       FirebaseService.query(
         FirebaseService.collection(FirebaseService.db, "kpiAdjustments"),
-        FirebaseService.where("userId", "==", user.uid)
+        FirebaseService.where("taskId", "==", taskId),
+        FirebaseService.where("userId", "==", user.uid),
+        FirebaseService.limit(1)
       )
     ),
     departmentPlan(periodId, departmentId),
     activePeriod()
   ]);
 
-  const taskId = clean(task?.id || registration?.taskId);
-  const hasWorkItems = workItemsSnapshot.docs.some(item => clean(item.data()?.taskId) === taskId);
-  const hasEvaluation = evaluationsSnapshot.docs.some(item => clean(item.data()?.taskId) === taskId);
-  const hasAdjustment = adjustmentsSnapshot.docs.some(item => clean(item.data()?.taskId) === taskId);
+  const hasWorkItems = workItemsSnapshot.docs.length > 0;
+  const hasEvidence = evidenceSnapshot.docs.some(item => item.data()?.active !== false);
+  const hasEvaluation = evaluationsSnapshot.docs.length > 0;
+  const hasAdjustment = adjustmentsSnapshot.docs.length > 0;
   const planLocked = plan?.locked === true;
   const periodClosed = !activeEvaluationPeriod || clean(activeEvaluationPeriod.id) !== periodId;
 
   return {
     hasWorkItems,
+    hasEvidence,
     hasEvaluation,
     hasAdjustment,
     planLocked,
     periodClosed,
-    any: hasWorkItems || hasEvaluation || hasAdjustment || planLocked || periodClosed
+    any: hasWorkItems || hasEvidence || hasEvaluation || hasAdjustment || planLocked || periodClosed
   };
 }
 
@@ -318,6 +348,7 @@ function cancellationBlockerMessage(blockers) {
   if (blockers?.planLocked) return "Kế hoạch KPI của đơn vị đã khóa.";
   if (blockers?.hasEvaluation) return "Nhiệm vụ đã phát sinh dữ liệu tự đánh giá hoặc đánh giá KPI.";
   if (blockers?.hasAdjustment) return "Nhiệm vụ đã phát sinh đề nghị điều chỉnh KPI.";
+  if (blockers?.hasEvidence) return "Nhiệm vụ đã có tệp minh chứng nên không thể hủy tại đây.";
   if (blockers?.hasWorkItems) return "Nhiệm vụ đã phát sinh lượt công việc chi tiết.";
   return "Nhiệm vụ đã phát sinh dữ liệu nghiệp vụ nên không thể hủy tại đây.";
 }
@@ -981,7 +1012,7 @@ export const TaskRegistrationService = Object.freeze({
       const workType = standardWorkType(item.workType);
       const autoApprove = workspaceId === "CDTN"
         ? Permissions.isCdtnSecretary(user)
-        : (Permissions.hasDirectHeadAuthorityForDepartment(user, workspaceId) || (Permissions.isDirector(user) && workspaceId === "BGD"));
+        : Permissions.hasDirectHeadAuthorityForDepartment(user, workspaceId);
       const itemKey = String(item.id || item.code || "");
       const suppliedRows = Array.isArray(options?.personalItems?.[itemKey])
         ? options.personalItems[itemKey].filter(Boolean)
@@ -1034,6 +1065,9 @@ export const TaskRegistrationService = Object.freeze({
           fixedDeadlineDateKey
         });
 
+        const authoritySnapshot = Permissions.authorityForDepartment(user, workspaceId);
+        const canonicalApprovalAuthority = authoritySnapshot.authority || (workspaceId === "CDTN" ? "" : "NONE");
+
         const registration = {
           id,
           periodId: period.id,
@@ -1070,9 +1104,9 @@ export const TaskRegistrationService = Object.freeze({
           userPosition: user.position || "",
           userRole: user.role || "",
           // V1.23.0: snapshot authority theo workspace. Một Phó ở đơn vị chính có thể là HEAD tại đơn vị kiêm nhiệm.
-          userLeaderLevel: Permissions.authorityForDepartment(user, workspaceId).leaderLevel || "",
-          userApprovalAuthority: Permissions.authorityForDepartment(user, workspaceId).authority || "",
-          userIsDepartmentHead: Permissions.authorityForDepartment(user, workspaceId).isDepartmentHead === true,
+          userLeaderLevel: authoritySnapshot.leaderLevel || "",
+          userApprovalAuthority: canonicalApprovalAuthority,
+          userIsDepartmentHead: authoritySnapshot.isDepartmentHead === true,
           userAdditionalRoles: Array.isArray(user.additionalRoles) ? user.additionalRoles : [],
           workType,
           planType: workType === "DOT_XUAT" ? "DOT_XUAT" : "KE_HOACH",
@@ -1383,9 +1417,11 @@ export const TaskRegistrationService = Object.freeze({
           FirebaseService.doc(FirebaseService.db, "tasks", registration.taskId)
         );
         const task = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
-        if (!taskDocumentCancellable(task, user, registration)) return [registration.id, false];
-        const blockers = await cancellationBlockers(task, registration, user);
-        return [registration.id, blockers.any !== true];
+        /*
+         * Chỉ dùng state của task để quyết định hiển thị nút. Các blocker collection
+         * được kiểm tra lại authoritative ngay trước batch cancel trong cancelApprovedRegistration().
+         */
+        return [registration.id, taskDocumentCancellable(task, user, registration)];
       } catch (error) {
         console.warn("Không kiểm tra được điều kiện hủy nhiệm vụ tự đăng ký:", error);
         return [registration.id, false];
@@ -1402,7 +1438,7 @@ export const TaskRegistrationService = Object.freeze({
     if (!registration?.id) throw new Error("Không tìm thấy đăng ký cần hủy.");
     if (!cancellationReason) throw new Error("Vui lòng nhập lý do hủy đầu việc.");
     if (!(await canCancelApprovedOwnRegistration(user, registration))) {
-      throw new Error("Chỉ chính Trưởng/Phó phòng hoặc người có vai trò Chi đoàn phù hợp mới được hủy nhiệm vụ do mình đăng ký.");
+      throw new Error("Chỉ chính người có thẩm quyền tự động duyệt registration của mình mới được hủy nhiệm vụ trước khi xác nhận tiếp nhận.");
     }
 
     const taskReference = FirebaseService.doc(FirebaseService.db, "tasks", registration.taskId);
@@ -1414,7 +1450,7 @@ export const TaskRegistrationService = Object.freeze({
     const task = { id: taskSnapshot.id, ...taskSnapshot.data() };
     if (!taskDocumentCancellable(task, user, registration)) {
       throw new Error(
-        "Chỉ được hủy nhiệm vụ tự đăng ký của chính mình khi chưa hoàn thành, chưa đánh giá, chưa khóa điểm và chưa phát sinh tiến độ hoặc minh chứng."
+        "Chỉ được hủy nhiệm vụ tự đăng ký trước khi bấm “Xác nhận cá nhân đã nhận” và khi nhiệm vụ chưa phát sinh tiến độ, minh chứng hoặc đánh giá."
       );
     }
 

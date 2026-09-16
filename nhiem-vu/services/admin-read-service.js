@@ -1,5 +1,5 @@
 /** Chẩn đoán production dành riêng cho ADMIN. */
-import { FirebaseService } from "../core/firebase-service.js?v=20260911.V1_23_1";
+import { FirebaseService } from "../core/firebase-service.js?v=20260916.V1_24_7_HTXH_1";
 
 const COLLECTION_LIMIT = 2000;
 const clean = value => String(value ?? "").trim();
@@ -32,7 +32,7 @@ function validateUsers(items) {
       emails.set(email, item.id);
     }
     if (role === "DIRECTOR" && department !== "BGD") issues.push(issue("DIRECTOR_DEPARTMENT", "ERROR", "users", item.id, "DIRECTOR phải thuộc BGD."));
-    if (role === "TCHC_COORDINATOR" && department !== "TCKT") issues.push(issue("COORDINATOR_DEPARTMENT", "ERROR", "users", item.id, "TCHC_COORDINATOR phải thuộc Phòng Tổ chức - Kế toán (TCKT)."));
+    if (role === "TCHC_COORDINATOR" && department !== "TCKT") issues.push(issue("COORDINATOR_DEPARTMENT", "ERROR", "users", item.id, "TCHC_COORDINATOR phải thuộc TCKT."));
     if (role === "DEPARTMENT_LEADER" && !/(trưởng|truong|phó|pho|phụ trách|phu trach)/i.test(position)) issues.push(issue("LEADER_POSITION", "WARNING", "users", item.id, "Vai trò lãnh đạo nhưng chức danh chưa thể hiện Trưởng/Phó/Phụ trách."));
   }
   return issues;

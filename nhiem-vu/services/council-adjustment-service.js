@@ -6,9 +6,9 @@
  * councilReviewRounds/{periodId}/departments/{departmentId}
  * councilReviewRounds/{periodId}/departments/{departmentId}/requests/{userId}_{targetId}
  */
-import { FirebaseService } from "../core/firebase-service.js?v=20260911.V1_23_1";
-import { UserContext } from "../core/user-context.js?v=20260911.V1_23_1";
-import { Permissions } from "../core/permissions.js?v=20260911.V1_23_1";
+import { FirebaseService } from "../core/firebase-service.js?v=20260916.V1_24_7_HTXH_1";
+import { UserContext } from "../core/user-context.js?v=20260916.V1_24_7_HTXH_1";
+import { Permissions } from "../core/permissions.js?v=20260916.V1_24_7_HTXH_1";
 
 const REQUEST_TYPES = Object.freeze(["SCORE", "EVIDENCE", "SCORE_AND_EVIDENCE"]);
 const OPEN_REQUEST_STATUSES = Object.freeze(["OPEN", "RETURNED"]);
@@ -46,7 +46,7 @@ function isDepartmentManagerFor(departmentId, user = UserContext.getUser()) {
 
 async function ensureOpenRound(periodId, departmentId = "") {
   const snapshot = await FirebaseService.getDoc(roundRef(periodId));
-  if (!snapshot.exists()) throw new Error("Phòng Tổ chức - Kế toán chưa mở đợt điều chỉnh sau Hội đồng.");
+  if (!snapshot.exists()) throw new Error("TCKT chưa mở đợt điều chỉnh sau Hội đồng.");
   const round = { id: snapshot.id, ...snapshot.data() };
   if (upper(round.status) !== "OPEN") throw new Error("Đợt điều chỉnh sau Hội đồng hiện đã khóa.");
   if (departmentId) {
